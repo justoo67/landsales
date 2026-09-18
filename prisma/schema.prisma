@@ -1,0 +1,40 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Plot {
+  id              String   @id // Unguessable short ID (nanoid) e.g., "m8x2k4p9q1"
+  title           String
+  status          String   @default("AVAILABLE") // AVAILABLE, PENDING, SOLD
+  priceType       String   @default("FIXED") // FIXED, CONTACT_AGENT
+  priceKes        Float?
+  sizePreset      String   // "50x100", "40x80", "100x100", "ACRES", "HECTARES", "SQM", "CUSTOM"
+  sizeCustomValue String?  // e.g. "0.5", "2.5", "100x150 ft"
+  zoning          String?  // Residential, Agricultural, Commercial, Mixed
+  roadAccess      String?  // Tarmac, All-weather gravel, Dirt road, None
+  waterSource     String?  // Borehole, Piped county water, Natural stream, None
+  electricity     String?  // On-site, Nearby (<200m), Off-grid
+  description     String?
+  latitude        Float
+  longitude       Float
+  photos          String   // JSON string of photo URLs/paths
+  videoUrl        String?  // Video URL/path
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AgentProfile {
+  id             String   @id @default("default_agent")
+  agentName      String   @default("Land Sales Specialist")
+  email          String   @unique @default("agent@example.com")
+  passwordHash   String?
+  whatsappNumber String   @default("+254700000000")
+  customGreeting String?  @default("Hi! I'm inquiring about [Plot Title]. Is it still available?")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
