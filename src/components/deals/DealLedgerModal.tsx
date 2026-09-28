@@ -38,6 +38,7 @@ interface DealData {
   buyerName: string;
   buyerPhone: string;
   buyerNationalId: string | null;
+  buyerCustomFields: string | null;
   agreedPriceKes: number;
   paymentType: string;
   depositKes: number;
@@ -266,38 +267,76 @@ Thank you for your commitment!`;
         ) : (
           <div className="overflow-y-auto p-4 sm:p-6 space-y-5">
             {/* Buyer Contact & Summary Card */}
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
-                  Buyer Information
-                </span>
-                <h4 className="font-bold text-slate-900 text-base">{deal.buyerName}</h4>
-                <div className="text-xs text-slate-600 mt-0.5 font-medium">
-                  {deal.buyerPhone} {deal.buyerNationalId ? `• ID: ${deal.buyerNationalId}` : ''}
+            {(() => {
+              const customFields = (() => {
+                if (deal.buyerCustomFields) {
+                  try {
+                    const parsed = JSON.parse(deal.buyerCustomFields);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                      return parsed as { id?: string; label: string; value: string }[];
+                    }
+                  } catch {
+                    // Ignore JSON parse errors
+                  }
+                }
+                if (deal.buyerNationalId) {
+                  return [{ id: 'legacy-id', label: 'National ID / PIN', value: deal.buyerNationalId }];
+                }
+                return [];
+              })();
+
+              return (
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
+                        Buyer Information
+                      </span>
+                      <h4 className="font-bold text-slate-900 text-base">{deal.buyerName}</h4>
+                      <div className="text-xs text-slate-600 mt-0.5 font-medium">
+                        {deal.buyerPhone}
+                      </div>
+                    </div>
+
+                    {/* 1-Tap Call & WhatsApp triggers adhering to 44x44pt target */}
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`tel:${deal.buyerPhone}`}
+                        className="w-11 h-11 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center shadow-sm active:scale-95 transition-transform"
+                        title="Call Buyer"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </a>
+
+                      <a
+                        href={`https://wa.me/${cleanPhone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-11 h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 flex items-center justify-center shadow-sm active:scale-95 transition-transform"
+                        title="Chat on WhatsApp"
+                      >
+                        <MessageCircle className="w-5 h-5 fill-current" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Buyer Custom Identifier Badges */}
+                  {customFields.length > 0 && (
+                    <div className="pt-2.5 border-t border-slate-200/70 flex flex-wrap gap-1.5">
+                      {customFields.map((field, idx) => (
+                        <div
+                          key={field.id || `${field.label}-${idx}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs shadow-2xs"
+                        >
+                          <span className="font-semibold text-slate-500">{field.label}:</span>
+                          <span className="font-medium text-slate-900">{field.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              {/* 1-Tap Call & WhatsApp triggers adhering to 44x44pt target */}
-              <div className="flex items-center gap-2">
-                <a
-                  href={`tel:${deal.buyerPhone}`}
-                  className="w-11 h-11 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center shadow-sm active:scale-95 transition-transform"
-                  title="Call Buyer"
-                >
-                  <Phone className="w-4 h-4" />
-                </a>
-
-                <a
-                  href={`https://wa.me/${cleanPhone}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-11 h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 flex items-center justify-center shadow-sm active:scale-95 transition-transform"
-                  title="Chat on WhatsApp"
-                >
-                  <MessageCircle className="w-5 h-5 fill-current" />
-                </a>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Financial Progress Bar Card */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">

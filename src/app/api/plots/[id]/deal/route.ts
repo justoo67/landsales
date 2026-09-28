@@ -55,6 +55,7 @@ export async function POST(
       buyerName,
       buyerPhone,
       buyerNationalId,
+      buyerCustomFields,
       agreedPriceKes,
       paymentType = 'LUMP_SUM',
       depositKes = 0,
@@ -85,6 +86,12 @@ export async function POST(
       where: { plotId },
     });
 
+    const customFieldsString = Array.isArray(buyerCustomFields)
+      ? JSON.stringify(buyerCustomFields)
+      : typeof buyerCustomFields === 'string'
+      ? buyerCustomFields
+      : null;
+
     let deal;
     if (existingDeal) {
       deal = await prisma.saleRecord.update({
@@ -93,6 +100,7 @@ export async function POST(
           buyerName,
           buyerPhone,
           buyerNationalId: buyerNationalId || null,
+          buyerCustomFields: customFieldsString,
           agreedPriceKes: numericPrice,
           paymentType,
           depositKes: numericDeposit,
@@ -112,6 +120,7 @@ export async function POST(
           buyerName,
           buyerPhone,
           buyerNationalId: buyerNationalId || null,
+          buyerCustomFields: customFieldsString,
           agreedPriceKes: numericPrice,
           paymentType,
           depositKes: numericDeposit,

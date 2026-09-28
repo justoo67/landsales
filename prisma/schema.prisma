@@ -35,10 +35,11 @@ model SaleRecord {
   id              String               @id @default(cuid())
   plotId          String               @unique
   plot            Plot                 @relation(fields: [plotId], references: [id], onDelete: Cascade)
-  buyerName       String
-  buyerPhone      String
-  buyerNationalId String?              // National ID or KRA PIN for conveyancing
-  agreedPriceKes  Float
+  buyerName         String
+  buyerPhone        String
+  buyerNationalId   String?              // National ID or KRA PIN for conveyancing
+  buyerCustomFields String?              // JSON string of custom key-value buyer details (e.g. Next of Kin, Advocate, etc.)
+  agreedPriceKes    Float
   paymentType     String               @default("LUMP_SUM") // LUMP_SUM or INSTALLMENT
   depositKes      Float                @default(0)
   balanceKes      Float                @default(0)
