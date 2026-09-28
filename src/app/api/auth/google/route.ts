@@ -103,7 +103,7 @@ export async function GET(req: Request) {
         name: agent.agentName,
       });
 
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+      return NextResponse.redirect(new URL('/dashboard?welcome=true', req.url));
     } catch (err) {
       console.error('Google OAuth exchange error:', err);
       return NextResponse.redirect(new URL('/login?error=OAuthFailed', req.url));
@@ -125,7 +125,7 @@ export async function GET(req: Request) {
         agentId: agent.id,
         name: agent.agentName,
       });
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+      return NextResponse.redirect(new URL('/dashboard?welcome=true', req.url));
     }
   }
 

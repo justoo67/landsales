@@ -49,7 +49,7 @@ function LoginForm() {
         throw new Error(data.error || 'Login failed');
       }
 
-      router.push('/dashboard');
+      router.push('/dashboard?welcome=true');
       router.refresh();
     } catch (err: unknown) {
       if (err instanceof Error) {
