@@ -16,8 +16,9 @@ export async function POST(req: Request) {
 
     await ensureDefaultAgent();
 
-    const allowedEmail = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
-    if (email.toLowerCase() !== allowedEmail.toLowerCase()) {
+    const allowedConfig = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
+    const allowedEmails = allowedConfig.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+    if (allowedEmails.length > 0 && !allowedEmails.includes(email.toLowerCase())) {
       return NextResponse.json(
         { error: 'Unauthorized: Not an approved agent account' },
         { status: 403 }

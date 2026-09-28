@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import AgentNavbar from '@/components/layout/AgentNavbar';
+import SaleRecordDrawer from '@/components/deals/SaleRecordDrawer';
+import DealLedgerModal from '@/components/deals/DealLedgerModal';
 import {
   Plus,
   Search,
@@ -16,6 +18,8 @@ import {
   Map,
   ListFilter,
   Eye,
+  Receipt,
+  TrendingUp,
 } from 'lucide-react';
 
 const DynamicMasterMap = dynamic(
@@ -55,6 +59,26 @@ export default function DashboardPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [agentName, setAgentName] = useState('Agent');
 
+  // Phase 2: Sales Ledger & Installment Modals State
+  const [saleDrawerTarget, setSaleDrawerTarget] = useState<{
+    plotId: string;
+    plotTitle: string;
+    defaultPrice: number | null;
+    targetStatus: 'PENDING' | 'SOLD';
+  } | null>(null);
+
+  const [activeLedgerPlot, setActiveLedgerPlot] = useState<{
+    plotId: string;
+    plotTitle: string;
+  } | null>(null);
+
+  const [dealsMetrics, setDealsMetrics] = useState<{
+    totalDeals: number;
+    totalSoldVolume: number;
+    totalCollected: number;
+    totalOutstanding: number;
+  } | null>(null);
+
   const fetchPlots = async () => {
     try {
       const res = await fetch('/api/plots');
@@ -83,9 +107,22 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchDealsMetrics = async () => {
+    try {
+      const res = await fetch('/api/deals');
+      if (res.ok) {
+        const data = await res.json();
+        setDealsMetrics(data.metrics || null);
+      }
+    } catch (err) {
+      console.error('Fetch deals metrics error:', err);
+    }
+  };
+
   useEffect(() => {
     fetchPlots();
     fetchProfile();
+    fetchDealsMetrics();
   }, []);
 
   const handleStatusChange = async (id: string, newStatus: string) => {
@@ -99,9 +136,23 @@ export default function DashboardPage() {
         setPlots((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p))
         );
+        fetchDealsMetrics();
       }
     } catch (err) {
       console.error('Status update error:', err);
+    }
+  };
+
+  const handleStatusSelect = (plot: Plot, newStatus: string) => {
+    if (newStatus === 'PENDING' || newStatus === 'SOLD') {
+      setSaleDrawerTarget({
+        plotId: plot.id,
+        plotTitle: plot.title,
+        defaultPrice: plot.priceKes,
+        targetStatus: newStatus,
+      });
+    } else {
+      handleStatusChange(plot.id, newStatus);
     }
   };
 
@@ -166,32 +217,87 @@ export default function DashboardPage() {
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm">
-            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider block">
-              🟢 Available
-            </span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+                Available
+              </span>
+            </div>
             <span className="text-2xl font-bold text-emerald-700 mt-1 block">
               {availableCount}
             </span>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm">
-            <span className="text-xs font-semibold text-orange-600 uppercase tracking-wider block">
-              🟠 Pending
-            </span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span className="text-xs font-semibold text-orange-700 uppercase tracking-wider">
+                Pending
+              </span>
+            </div>
             <span className="text-2xl font-bold text-orange-700 mt-1 block">
               {pendingCount}
             </span>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-rose-100 shadow-sm">
-            <span className="text-xs font-semibold text-rose-600 uppercase tracking-wider block">
-              🔴 Sold
-            </span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span className="text-xs font-semibold text-rose-700 uppercase tracking-wider">
+                Sold
+              </span>
+            </div>
             <span className="text-2xl font-bold text-rose-700 mt-1 block">
               {soldCount}
             </span>
           </div>
         </section>
+
+        {/* Sales Pipeline & Revenue Summary */}
+        {dealsMetrics && dealsMetrics.totalDeals > 0 && (
+          <section className="bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-5 text-white shadow-lg mb-6 border border-slate-700/60">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-700/80">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-sky-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-sky-400">
+                  Sales & Installment Pipeline
+                </span>
+              </div>
+              <span className="text-xs text-slate-300 font-semibold bg-white/10 px-2.5 py-0.5 rounded-full">
+                {dealsMetrics.totalDeals} Deals Active
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 text-center sm:text-left">
+              <div>
+                <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  Total Booked
+                </span>
+                <span className="text-base sm:text-xl font-extrabold text-white block mt-0.5">
+                  KSh {dealsMetrics.totalSoldVolume.toLocaleString('en-KE')}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider block">
+                  Cleared Funds
+                </span>
+                <span className="text-base sm:text-xl font-extrabold text-emerald-400 block mt-0.5">
+                  KSh {dealsMetrics.totalCollected.toLocaleString('en-KE')}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider block">
+                  Remaining Due
+                </span>
+                <span className="text-base sm:text-xl font-extrabold text-amber-400 block mt-0.5">
+                  KSh {dealsMetrics.totalOutstanding.toLocaleString('en-KE')}
+                </span>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Search, Filter Tabs & View Toggle */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6 space-y-3">
@@ -235,16 +341,16 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Status Tabs */}
+          {/* Status Tabs adhering to Apple HIG (min 44x44pt) */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             {['ALL', 'AVAILABLE', 'PENDING', 'SOLD'].map((st) => (
               <button
                 key={st}
                 onClick={() => setActiveStatus(st)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all touch-manipulation min-h-[36px] ${
+                className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all touch-manipulation min-h-[44px] ${
                   activeStatus === st
                     ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 {st === 'ALL' ? 'All Plots' : st}
@@ -337,14 +443,17 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
-                    {/* Quick 1-to-1 Client View Button */}
+                    {/* Quick 1-to-1 Client View Button (min 44x44pt hit target) */}
                     <Link
                       href={`/p/${plot.id}`}
                       target="_blank"
-                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-lg bg-black/50 hover:bg-black/70 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition-transform"
+                      className="absolute top-1 right-1 w-11 h-11 flex items-center justify-center active:scale-95 transition-transform z-10 touch-manipulation"
                       title="View Client Page"
+                      aria-label="View Client Page"
                     >
-                      <Eye className="w-4 h-4" />
+                      <span className="w-8 h-8 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center shadow-sm">
+                        <Eye className="w-4 h-4" />
+                      </span>
                     </Link>
                   </div>
 
@@ -359,80 +468,133 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 mb-3 text-xs">
-                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium">
-                          📐 {sizeDisplay}
+                        <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">
+                          {sizeDisplay}
                         </span>
                         {plot.zoning && (
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium">
-                            🏷️ {plot.zoning}
+                          <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">
+                            {plot.zoning}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Bottom Actions */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      {/* 1-Click Status Dropdown */}
-                      <select
-                        value={plot.status}
-                        onChange={(e) =>
-                          handleStatusChange(plot.id, e.target.value)
+                    {/* Deal Ledger CTA button if Sold or Pending */}
+                    {(plot.status === 'PENDING' || plot.status === 'SOLD') && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActiveLedgerPlot({
+                            plotId: plot.id,
+                            plotTitle: plot.title,
+                          })
                         }
-                        className="text-xs font-semibold py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 min-h-[36px]"
+                        className="w-full mt-2 mb-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-sky-50 hover:bg-sky-100 active:scale-98 text-sky-800 border border-sky-200/80 rounded-xl text-xs font-bold transition-all min-h-[40px] touch-manipulation shadow-xs"
                       >
-                        <option value="AVAILABLE">🟢 Available</option>
-                        <option value="PENDING">🟠 Pending</option>
-                        <option value="SOLD">🔴 Sold</option>
-                      </select>
+                        <Receipt className="w-4 h-4 text-sky-600" />
+                        <span>Deal Ledger & Installments</span>
+                      </button>
+                    )}
 
-                      <div className="flex items-center gap-1">
-                        {/* Copy 1-to-1 Link */}
-                        <button
-                          onClick={() => handleCopyLink(plot.id)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-lg text-xs font-medium text-slate-700 transition-all min-h-[36px]"
-                          title="Copy 1-to-1 Client Link"
-                        >
-                          {copiedId === plot.id ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              <span className="text-emerald-600 font-semibold">
-                                Copied!
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Share2 className="w-3.5 h-3.5 text-slate-500" />
-                              <span>Copy Link</span>
-                            </>
-                          )}
-                        </button>
+                    {/* Bottom Actions adhering to Apple HIG */}
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    {/* 1-Click Status Dropdown */}
+                    <select
+                      value={plot.status}
+                      onChange={(e) =>
+                        handleStatusSelect(plot, e.target.value)
+                      }
+                      className="text-xs font-semibold py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-700 min-h-[44px] touch-manipulation"
+                    >
+                      <option value="AVAILABLE">Available</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="SOLD">Sold</option>
+                    </select>
 
-                        {/* Edit Link */}
-                        <Link
-                          href={`/dashboard/plots/${plot.id}/edit`}
-                          className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all"
-                          title="Edit Details"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Link>
+                    <div className="flex items-center gap-1">
+                      {/* Copy 1-to-1 Link */}
+                      <button
+                        onClick={() => handleCopyLink(plot.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl text-xs font-semibold text-slate-700 transition-all min-h-[44px] touch-manipulation"
+                        title="Copy 1-to-1 Client Link"
+                      >
+                        {copiedId === plot.id ? (
+                          <>
+                            <Check className="w-4 h-4 text-emerald-600" />
+                            <span className="text-emerald-600 font-semibold">
+                              Copied!
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-4 h-4 text-slate-500" />
+                            <span>Copy Link</span>
+                          </>
+                        )}
+                      </button>
 
-                        {/* Delete Button */}
-                        <button
-                          onClick={() => handleDelete(plot.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {/* Edit Link */}
+                      <Link
+                        href={`/dashboard/plots/${plot.id}/edit`}
+                        className="w-11 h-11 flex items-center justify-center text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all touch-manipulation active:scale-95"
+                        title="Edit Details"
+                        aria-label="Edit Plot"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Link>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => handleDelete(plot.id)}
+                        className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all touch-manipulation active:scale-95"
+                        title="Delete"
+                        aria-label="Delete Plot"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
-    </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </main>
+
+    {/* Sale Record Drawer (Slides up on mobile) */}
+    {saleDrawerTarget && (
+      <SaleRecordDrawer
+        plotId={saleDrawerTarget.plotId}
+        plotTitle={saleDrawerTarget.plotTitle}
+        defaultPrice={saleDrawerTarget.defaultPrice}
+        targetStatus={saleDrawerTarget.targetStatus}
+        isOpen={true}
+        onClose={() => setSaleDrawerTarget(null)}
+        onSuccess={(newStatus) => {
+          setPlots((prev) =>
+            prev.map((p) =>
+              p.id === saleDrawerTarget.plotId ? { ...p, status: newStatus } : p
+            )
+          );
+          fetchDealsMetrics();
+        }}
+      />
+    )}
+
+    {/* Deal Ledger & Installments Modal */}
+    {activeLedgerPlot && (
+      <DealLedgerModal
+        plotId={activeLedgerPlot.plotId}
+        plotTitle={activeLedgerPlot.plotTitle}
+        isOpen={true}
+        onClose={() => setActiveLedgerPlot(null)}
+        onDealUpdated={() => {
+          fetchPlots();
+          fetchDealsMetrics();
+        }}
+      />
+    )}
+  </div>
   );
 }

@@ -1,6 +1,7 @@
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -24,12 +25,58 @@ model Plot {
   longitude       Float
   photos          String   // JSON string of photo URLs/paths
   videoUrl        String?  // Video URL/path
+  customAttributes String? // JSON string of custom key-value features
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  saleRecord      SaleRecord?
+}
+
+model SaleRecord {
+  id              String               @id @default(cuid())
+  plotId          String               @unique
+  plot            Plot                 @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  buyerName       String
+  buyerPhone      String
+  buyerNationalId String?              // National ID or KRA PIN for conveyancing
+  agreedPriceKes  Float
+  paymentType     String               @default("LUMP_SUM") // LUMP_SUM or INSTALLMENT
+  depositKes      Float                @default(0)
+  balanceKes      Float                @default(0)
+  nextDueDate     DateTime?
+  titleStatus     String               @default("DEPOSIT_PAID") 
+  // DEPOSIT_PAID -> AGREEMENT_SIGNED -> BALANCE_CLEARED -> LCB_CONSENT -> TITLE_ISSUED
+  notes           String?
+  closedAt        DateTime             @default(now())
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  installments    PaymentInstallment[]
+  review          BuyerReview?
+}
+
+model PaymentInstallment {
+  id           String     @id @default(cuid())
+  saleRecordId String
+  saleRecord   SaleRecord @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
+  amountKes    Float
+  paymentDate  DateTime   @default(now())
+  reference    String?    // e.g., M-Pesa transaction code or bank ref
+  notes        String?
+  createdAt    DateTime   @default(now())
+}
+
+model BuyerReview {
+  id           String     @id @default(cuid())
+  saleRecordId String     @unique
+  saleRecord   SaleRecord @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
+  buyerName    String
+  rating       Int        @default(5)
+  comment      String
+  isPublished  Boolean    @default(true)
+  createdAt    DateTime   @default(now())
 }
 
 model AgentProfile {
-  id             String   @id @default("default_agent")
+  id             String   @id @default(cuid())
   agentName      String   @default("Land Sales Specialist")
   email          String   @unique @default("agent@example.com")
   passwordHash   String?

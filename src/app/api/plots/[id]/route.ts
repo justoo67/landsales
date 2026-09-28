@@ -55,6 +55,10 @@ export async function PATCH(
     if (body.longitude !== undefined) data.longitude = parseFloat(body.longitude);
     if (body.photos !== undefined) data.photos = JSON.stringify(body.photos);
     if (body.videoUrl !== undefined) data.videoUrl = body.videoUrl;
+    if (body.customAttributes !== undefined)
+      data.customAttributes = body.customAttributes
+        ? JSON.stringify(body.customAttributes)
+        : null;
 
     const plot = await prisma.plot.update({
       where: { id },

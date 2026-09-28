@@ -9,12 +9,27 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const errorParam = searchParams.get('error');
 
+  const getErrorMessage = (err: string | null): string | null => {
+    if (!err) return null;
+    if (err === 'UnauthorizedAccountNotAllowed') {
+      return 'This Google account is not authorized. Please sign in with the approved agent email address configured in ALLOWED_AGENT_EMAIL.';
+    }
+    if (err === 'GoogleOAuthNotConfigured') {
+      return 'Google OAuth credentials (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) are not configured on this server.';
+    }
+    if (err === 'TokenExchangeFailed' || err === 'OAuthFailed') {
+      return 'Google sign-in encountered an issue. Please try again.';
+    }
+    if (err === 'NoEmailFromGoogle') {
+      return 'Google did not provide an email address. Please verify your Google account permissions.';
+    }
+    return `Authentication failed (${err}). Please check your credentials.`;
+  };
+
   const [email, setEmail] = useState('agent@example.com');
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(
-    errorParam ? 'Authentication failed. Please check your credentials.' : null
-  );
+  const [error, setError] = useState<string | null>(getErrorMessage(errorParam));
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();

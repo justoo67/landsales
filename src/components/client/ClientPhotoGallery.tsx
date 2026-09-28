@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, X, MapPin } from 'lucide-react';
 
 interface ClientPhotoGalleryProps {
@@ -11,6 +11,7 @@ interface ClientPhotoGalleryProps {
 export default function ClientPhotoGallery({ photos, title }: ClientPhotoGalleryProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const touchStartXRef = useRef<number | null>(null);
 
   if (!photos || photos.length === 0) {
     return (
@@ -29,10 +30,30 @@ export default function ClientPhotoGallery({ photos, title }: ClientPhotoGallery
     setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current !== null) {
+      const diff = e.changedTouches[0].clientX - touchStartXRef.current;
+      if (diff > 45) {
+        prevPhoto();
+      } else if (diff < -45) {
+        nextPhoto();
+      }
+      touchStartXRef.current = null;
+    }
+  };
+
   return (
     <div className="space-y-2">
       {/* Main Showcase Image */}
-      <div className="relative aspect-video sm:aspect-[16/10] rounded-3xl overflow-hidden shadow-sm bg-slate-900 border border-slate-200 group">
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="relative aspect-video sm:aspect-[16/10] rounded-3xl overflow-hidden shadow-sm bg-slate-900 border border-slate-200 group touch-pan-y"
+      >
         <img
           src={photos[currentIndex]}
           alt={`${title} - Photo ${currentIndex + 1}`}
@@ -40,18 +61,21 @@ export default function ClientPhotoGallery({ photos, title }: ClientPhotoGallery
         />
 
         {/* Counter Badge */}
-        <div className="absolute top-3 right-3 px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-lg text-white text-xs font-medium">
+        <div className="absolute top-3 right-3 px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-lg text-white text-xs font-medium pointer-events-none">
           {currentIndex + 1} / {photos.length}
         </div>
 
-        {/* Lightbox Trigger */}
+        {/* Lightbox Trigger adhering to Apple HIG (min 44x44pt) */}
         <button
           onClick={() => setLightboxOpen(true)}
           type="button"
-          className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-black/60 backdrop-blur-md text-white flex items-center justify-center active:scale-90 transition-transform"
+          className="absolute top-2 left-2 w-11 h-11 flex items-center justify-center touch-manipulation active:scale-90 transition-transform"
           title="Fullscreen"
+          aria-label="View fullscreen photo"
         >
-          <Maximize2 className="w-4 h-4" />
+          <span className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-md text-white flex items-center justify-center shadow-sm">
+            <Maximize2 className="w-4 h-4" />
+          </span>
         </button>
 
         {/* Arrow Controls (if multiple photos) */}

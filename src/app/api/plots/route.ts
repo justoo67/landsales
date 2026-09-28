@@ -65,6 +65,7 @@ export async function POST(req: Request) {
       longitude,
       photos = [],
       videoUrl,
+      customAttributes,
     } = body;
 
     if (!title || latitude === undefined || longitude === undefined) {
@@ -95,6 +96,7 @@ export async function POST(req: Request) {
         longitude: parseFloat(longitude),
         photos: JSON.stringify(photos),
         videoUrl,
+        customAttributes: customAttributes ? JSON.stringify(customAttributes) : null,
       },
     });
 

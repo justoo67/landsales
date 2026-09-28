@@ -11,7 +11,8 @@ import {
   MessageCircle,
   Phone,
   ShieldCheck,
-  Sparkles,
+  Star,
+  Video,
 } from 'lucide-react';
 import ClientPhotoGallery from '@/components/client/ClientPhotoGallery';
 import ClientListingMap from '@/components/client/ClientListingMap';
@@ -63,7 +64,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ClientShowcasePage({ params }: PageProps) {
   const { id } = await params;
-  const plot = await prisma.plot.findUnique({ where: { id } });
+  const plot = await prisma.plot.findUnique({
+    where: { id },
+    include: {
+      saleRecord: {
+        include: {
+          review: true,
+        },
+      },
+    },
+  });
 
   if (!plot) {
     notFound();
@@ -78,6 +88,18 @@ export default async function ClientShowcasePage({ params }: PageProps) {
     photos = JSON.parse(plot.photos);
   } catch {
     photos = [];
+  }
+
+  let customAttributes: { label: string; value: string }[] = [];
+  try {
+    if (plot.customAttributes) {
+      const parsed = JSON.parse(plot.customAttributes);
+      if (Array.isArray(parsed)) {
+        customAttributes = parsed.filter((item: { label?: string; value?: string }) => item && item.label && item.value);
+      }
+    }
+  } catch {
+    customAttributes = [];
   }
 
   const formattedPrice =
@@ -113,19 +135,28 @@ export default async function ClientShowcasePage({ params }: PageProps) {
             </span>
           </div>
           <span
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${
               plot.status === 'AVAILABLE'
-                ? 'bg-emerald-100 text-emerald-800'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                 : plot.status === 'PENDING'
-                ? 'bg-orange-100 text-orange-800'
-                : 'bg-rose-100 text-rose-800'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                : 'bg-rose-50 text-rose-700 border border-rose-200/60'
             }`}
           >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                plot.status === 'AVAILABLE'
+                  ? 'bg-emerald-500'
+                  : plot.status === 'PENDING'
+                  ? 'bg-amber-500'
+                  : 'bg-rose-500'
+              }`}
+            />
             {plot.status === 'AVAILABLE'
-              ? '🟢 Available'
+              ? 'Available'
               : plot.status === 'PENDING'
-              ? '🟠 Pending / Under Offer'
-              : '🔴 Sold'}
+              ? 'Under Offer'
+              : 'Sold'}
           </span>
         </div>
       </header>
@@ -138,7 +169,10 @@ export default async function ClientShowcasePage({ params }: PageProps) {
         {plot.videoUrl && (
           <div className="bg-black rounded-3xl overflow-hidden shadow-lg border border-slate-200">
             <div className="p-3 bg-slate-900 text-white text-xs font-medium flex items-center justify-between">
-              <span>🎥 Walkthrough Video</span>
+              <div className="flex items-center gap-2">
+                <Video className="w-3.5 h-3.5 text-sky-400" />
+                <span>Walkthrough Video</span>
+              </div>
               <span className="text-slate-400">Tap to Play</span>
             </div>
             <video
@@ -163,7 +197,7 @@ export default async function ClientShowcasePage({ params }: PageProps) {
           </div>
 
           <div className="pt-2">
-            <span className="text-xs text-slate-400 uppercase tracking-wider block">
+            <span className="text-xs text-slate-600 font-semibold uppercase tracking-wider block">
               Asking Price
             </span>
             <span className="text-3xl font-extrabold text-sky-700 tracking-tight block">
@@ -173,7 +207,7 @@ export default async function ClientShowcasePage({ params }: PageProps) {
 
           {plot.description && (
             <div className="pt-3 border-t border-slate-100">
-              <p className="text-slate-600 text-sm sm:text-base leading-relaxed whitespace-pre-line">
+              <p className="text-slate-700 text-sm sm:text-base leading-relaxed whitespace-pre-line">
                 {plot.description}
               </p>
             </div>
@@ -182,53 +216,84 @@ export default async function ClientShowcasePage({ params }: PageProps) {
 
         {/* Quick Specs Grid */}
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Plot Specifications
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Plot Specifications & Features
           </h2>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-xs text-slate-400 block mb-0.5">Plot Size</span>
-              <span className="font-semibold text-slate-800">📐 {sizeDisplay}</span>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-xs text-slate-400 block mb-0.5">Zoning / Use</span>
-              <span className="font-semibold text-slate-800">
-                🏷️ {plot.zoning || 'Residential'}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100/80">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">
+                Plot Size
+              </span>
+              <span className="font-semibold text-slate-900 text-sm sm:text-base">
+                {sizeDisplay}
               </span>
             </div>
 
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-xs text-slate-400 block mb-0.5">Road Access</span>
-              <span className="font-semibold text-slate-800">
-                🛣️ {plot.roadAccess || 'Gravel road'}
-              </span>
-            </div>
+            {plot.zoning && (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100/80">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">
+                  Zoning / Use
+                </span>
+                <span className="font-semibold text-slate-900 text-sm sm:text-base">
+                  {plot.zoning}
+                </span>
+              </div>
+            )}
 
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-xs text-slate-400 block mb-0.5">Water Source</span>
-              <span className="font-semibold text-slate-800">
-                💧 {plot.waterSource || 'Borehole'}
-              </span>
-            </div>
+            {plot.roadAccess && (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100/80">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">
+                  Road Access
+                </span>
+                <span className="font-semibold text-slate-900 text-sm sm:text-base">
+                  {plot.roadAccess}
+                </span>
+              </div>
+            )}
 
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 col-span-2">
-              <span className="text-xs text-slate-400 block mb-0.5">Electricity Grid</span>
-              <span className="font-semibold text-slate-800">
-                ⚡ {plot.electricity || 'On-site'}
-              </span>
-            </div>
+            {plot.waterSource && (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100/80">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">
+                  Water Source
+                </span>
+                <span className="font-semibold text-slate-900 text-sm sm:text-base">
+                  {plot.waterSource}
+                </span>
+              </div>
+            )}
+
+            {plot.electricity && (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100/80">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">
+                  Electricity Grid
+                </span>
+                <span className="font-semibold text-slate-900 text-sm sm:text-base">
+                  {plot.electricity}
+                </span>
+              </div>
+            )}
+
+            {customAttributes.map((attr, idx) => (
+              <div key={idx} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100/80">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">
+                  {attr.label}
+                </span>
+                <span className="font-semibold text-slate-900 text-sm sm:text-base">
+                  {attr.value}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* OpenStreetMap Location & Directions */}
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">
               Exact Location
             </h2>
-            <span className="text-xs text-slate-500 font-mono">
+            <span className="text-xs text-slate-700 font-mono font-semibold">
               {plot.latitude.toFixed(4)}, {plot.longitude.toFixed(4)}
             </span>
           </div>
@@ -238,6 +303,37 @@ export default async function ClientShowcasePage({ params }: PageProps) {
             title={plot.title}
           />
         </div>
+
+        {/* Verified Buyer Review & Social Proof */}
+        {plot.saleRecord?.review?.isPublished && (
+          <div className="bg-emerald-50/90 rounded-3xl p-5 sm:p-6 border border-emerald-200/80 shadow-sm space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Verified Buyer Review</span>
+              </div>
+              <div className="flex items-center gap-0.5 text-amber-500">
+                {Array.from({ length: plot.saleRecord.review.rating || 5 }).map((_, i) => (
+                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                ))}
+              </div>
+            </div>
+            <p className="text-slate-800 text-sm sm:text-base italic font-medium leading-relaxed">
+              &ldquo;{plot.saleRecord.review.comment}&rdquo;
+            </p>
+            <div className="text-xs text-slate-600 font-semibold pt-1 border-t border-emerald-100 flex items-center justify-between">
+              <span>— {plot.saleRecord.review.buyerName}</span>
+              <div className="flex items-center gap-1 text-emerald-700 font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>
+                  {plot.saleRecord.titleStatus === 'TITLE_ISSUED'
+                    ? 'Ready Title Deed Delivered'
+                    : 'Verified Land Buyer'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Agent Info Card */}
         <div className="bg-gradient-to-tr from-slate-900 to-slate-800 rounded-3xl p-5 text-white shadow-lg space-y-2">

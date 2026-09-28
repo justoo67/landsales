@@ -31,10 +31,16 @@ export default function ListingViewMap({
       shadowSize: [41, 41],
     });
 
+    const isTouchDevice =
+      typeof window !== 'undefined' &&
+      ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
     const map = L.map(containerRef.current, {
       center: [latitude, longitude],
       zoom: 15,
       scrollWheelZoom: false,
+      dragging: !isTouchDevice,
+      touchZoom: false,
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -63,7 +69,7 @@ export default function ListingViewMap({
           className="flex items-center justify-center gap-2 px-4 py-3 bg-sky-600 hover:bg-sky-700 text-white font-medium text-sm rounded-xl shadow-lg active:scale-95 transition-all min-h-[44px] touch-manipulation"
         >
           <Compass className="w-4 h-4" />
-          <span>🧭 Get Driving Directions</span>
+          <span>Get Driving Directions</span>
         </a>
       </div>
     </div>

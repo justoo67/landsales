@@ -13,9 +13,27 @@ export async function GET(req: Request) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/google`;
 
-  // If no OAuth code and we have Google credentials, initiate OAuth redirect
+  // Determine production-safe base URL
+  const getAppBaseUrl = () => {
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
+    }
+    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+      return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`.replace(/\/$/, '');
+    }
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`.replace(/\/$/, '');
+    }
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    const proto = req.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
+    return host ? `${proto}://${host}` : 'http://localhost:3000';
+  };
+
+  const appBaseUrl = getAppBaseUrl();
+  const redirectUri = `${appBaseUrl}/api/auth/google`;
+
+  // If no OAuth code and Google credentials exist, initiate Google OAuth redirect
   if (!code && clientId) {
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
@@ -40,6 +58,7 @@ export async function GET(req: Request) {
 
       const tokens = await tokenRes.json();
       if (!tokens.access_token) {
+        console.error('Google token exchange failure:', tokens);
         return NextResponse.redirect(new URL('/login?error=TokenExchangeFailed', req.url));
       }
 
@@ -48,8 +67,18 @@ export async function GET(req: Request) {
       });
       const googleUser = await userRes.json();
 
-      const allowedEmail = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
-      if (googleUser.email.toLowerCase() !== allowedEmail.toLowerCase()) {
+      if (!googleUser.email) {
+        return NextResponse.redirect(new URL('/login?error=NoEmailFromGoogle', req.url));
+      }
+
+      const allowedEnv = process.env.ALLOWED_AGENT_EMAIL || '';
+      const allowedEmails = allowedEnv
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+
+      if (allowedEmails.length > 0 && !allowedEmails.includes(googleUser.email.toLowerCase())) {
+        console.warn(`Unauthorized Google sign-in attempt from: ${googleUser.email}`);
         return NextResponse.redirect(
           new URL('/login?error=UnauthorizedAccountNotAllowed', req.url)
         );
@@ -62,7 +91,6 @@ export async function GET(req: Request) {
           agentName: googleUser.name || 'Agent',
         },
         create: {
-          id: 'default_agent',
           email: googleUser.email.toLowerCase(),
           agentName: googleUser.name || 'Agent',
           whatsappNumber: '+254700000000',
@@ -82,21 +110,24 @@ export async function GET(req: Request) {
     }
   }
 
-  // If credentials are not yet configured in local dev, provide seamless 1-tap dev sign-in with the allowed agent email
-  await ensureDefaultAgent();
-  const allowedEmail = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
-  const agent = await prisma.agentProfile.findUnique({
-    where: { email: allowedEmail.toLowerCase() },
-  });
+  // Local development fallback: if credentials are not yet configured in local dev, allow quick sign-in
+  if (process.env.NODE_ENV !== 'production' && !clientId) {
+    await ensureDefaultAgent();
+    const allowedConfig = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
+    const defaultEmail = allowedConfig.split(',')[0].trim().toLowerCase();
+    const agent =
+      (await prisma.agentProfile.findUnique({ where: { email: defaultEmail } })) ||
+      (await prisma.agentProfile.findFirst());
 
-  if (agent) {
-    await createSession({
-      email: agent.email,
-      agentId: agent.id,
-      name: agent.agentName,
-    });
-    return NextResponse.redirect(new URL('/dashboard', req.url));
+    if (agent) {
+      await createSession({
+        email: agent.email,
+        agentId: agent.id,
+        name: agent.agentName,
+      });
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
   }
 
-  return NextResponse.redirect(new URL('/login', req.url));
+  return NextResponse.redirect(new URL('/login?error=GoogleOAuthNotConfigured', req.url));
 }

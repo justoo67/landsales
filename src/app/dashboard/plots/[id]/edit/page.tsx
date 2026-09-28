@@ -30,6 +30,22 @@ export default async function EditPlotPage({
     parsedPhotos = [];
   }
 
+  let parsedCustomAttributes: { id: string; label: string; value: string }[] = [];
+  try {
+    if (plot.customAttributes) {
+      const parsed = JSON.parse(plot.customAttributes);
+      if (Array.isArray(parsed)) {
+        parsedCustomAttributes = parsed.map((item: any, idx: number) => ({
+          id: item.id || `attr-${idx}-${Date.now()}`,
+          label: item.label || '',
+          value: item.value || '',
+        }));
+      }
+    }
+  } catch {
+    parsedCustomAttributes = [];
+  }
+
   const initialData = {
     id: plot.id,
     title: plot.title,
@@ -38,15 +54,16 @@ export default async function EditPlotPage({
     priceKes: plot.priceKes ? plot.priceKes.toString() : '',
     sizePreset: plot.sizePreset,
     sizeCustomValue: plot.sizeCustomValue || '',
-    zoning: plot.zoning || '',
-    roadAccess: plot.roadAccess || '',
-    waterSource: plot.waterSource || '',
-    electricity: plot.electricity || '',
+    zoning: plot.zoning,
+    roadAccess: plot.roadAccess,
+    waterSource: plot.waterSource,
+    electricity: plot.electricity,
     description: plot.description || '',
     latitude: plot.latitude,
     longitude: plot.longitude,
     photos: parsedPhotos,
     videoUrl: plot.videoUrl || '',
+    customAttributes: parsedCustomAttributes,
   };
 
   return (

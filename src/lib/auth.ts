@@ -55,16 +55,22 @@ export async function deleteSession() {
 }
 
 export async function ensureDefaultAgent() {
-  const defaultEmail = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
+  const allowedConfig = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
+  const defaultEmail = allowedConfig.split(',')[0].trim().toLowerCase();
+
   let agent = await prisma.agentProfile.findUnique({
     where: { email: defaultEmail },
   });
 
   if (!agent) {
+    // If an agent record exists already (e.g. logged in via Google OAuth), use it
+    agent = await prisma.agentProfile.findFirst();
+  }
+
+  if (!agent) {
     const defaultPasswordHash = await bcrypt.hash('admin123', 10);
     agent = await prisma.agentProfile.create({
       data: {
-        id: 'default_agent',
         email: defaultEmail,
         agentName: 'Land Sales Specialist',
         passwordHash: defaultPasswordHash,
