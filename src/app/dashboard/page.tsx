@@ -6,6 +6,7 @@ import Link from 'next/link';
 import AgentNavbar from '@/components/layout/AgentNavbar';
 import SaleRecordDrawer from '@/components/deals/SaleRecordDrawer';
 import DealLedgerModal from '@/components/deals/DealLedgerModal';
+import AgentOnboardingTour from '@/components/onboarding/AgentOnboardingTour';
 import {
   Plus,
   Search,
@@ -82,7 +83,7 @@ export default function DashboardPage() {
     totalOutstanding: number;
   } | null>(null);
 
-  const [showWelcome, setShowWelcome] = useState<boolean>(false);
+  const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
 
   const fetchPlots = async () => {
     try {
@@ -132,19 +133,13 @@ export default function DashboardPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const isWelcomeParam = params.get('welcome') === 'true';
-      const isDismissed = sessionStorage.getItem('plotpilot_welcome_dismissed') === 'true';
-      if (isWelcomeParam || !isDismissed) {
-        setShowWelcome(true);
+      const tourCompleted = localStorage.getItem('plotpilot_tour_completed') === 'true';
+      if (isWelcomeParam || !tourCompleted) {
+        const timer = setTimeout(() => setIsTourOpen(true), 500);
+        return () => clearTimeout(timer);
       }
     }
   }, []);
-
-  const handleDismissWelcome = () => {
-    setShowWelcome(false);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('plotpilot_welcome_dismissed', 'true');
-    }
-  };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
@@ -223,95 +218,25 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-slate-50">
-      <AgentNavbar agentName={agentName} />
+      <AgentNavbar
+        agentName={agentName}
+        onStartTour={() => setIsTourOpen(true)}
+      />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-20">
-        {/* Apple HIG Welcome & Onboarding Hero Banner */}
-        {showWelcome && (
-          <section className="relative overflow-hidden bg-gradient-to-br from-sky-600 via-sky-700 to-teal-700 rounded-3xl p-6 sm:p-8 text-white shadow-lg shadow-sky-900/10 mb-6 border border-white/20">
-            {/* Background decorative glows */}
-            <div className="absolute -top-16 -right-16 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-teal-400/20 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="relative z-10">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-bold uppercase tracking-wider text-sky-100 mb-3 border border-white/15">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Welcome to PlotPilot</span>
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight text-white">
-                    Welcome, {agentName}! 👋
-                  </h2>
-                  <p className="text-sm sm:text-base text-sky-100 mt-2 max-w-2xl leading-relaxed">
-                    Your digital land sales assistant is ready. Create parcel presentations with interactive GPS maps, photos, and direct WhatsApp sharing links that impress prospective buyers.
-                  </p>
-                </div>
-
-                {/* Dismiss Button */}
-                <button
-                  onClick={handleDismissWelcome}
-                  className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all touch-manipulation flex-shrink-0"
-                  aria-label="Dismiss welcome message"
-                  title="Dismiss"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* 3 Step Quick-Start Guide */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6">
-                <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-4">
-                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-white font-bold text-xs mb-2">
-                    1
-                  </div>
-                  <h4 className="text-sm font-bold text-white">Pin Your Plot</h4>
-                  <p className="text-xs text-sky-100 mt-1 leading-normal">
-                    Pin exact GPS coordinates on the interactive OpenStreetMap.
-                  </p>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-4">
-                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-white font-bold text-xs mb-2">
-                    2
-                  </div>
-                  <h4 className="text-sm font-bold text-white">Upload Media</h4>
-                  <p className="text-xs text-sky-100 mt-1 leading-normal">
-                    Add parcel photos and walkthrough video directly from your phone.
-                  </p>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-4">
-                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-white font-bold text-xs mb-2">
-                    3
-                  </div>
-                  <h4 className="text-sm font-bold text-white">Share via WhatsApp</h4>
-                  <p className="text-xs text-sky-100 mt-1 leading-normal">
-                    Send 1-to-1 client links with instant pre-filled WhatsApp lead buttons.
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Buttons adhering to Apple HIG */}
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/dashboard/plots/new"
-                  className="inline-flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 active:scale-95 text-sky-700 font-bold text-sm rounded-xl shadow-md transition-all min-h-[44px] touch-manipulation"
-                >
-                  <Plus className="w-4 h-4 text-sky-600" />
-                  <span>Add Your First Property</span>
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="inline-flex items-center gap-1.5 px-4 py-3 bg-white/15 hover:bg-white/25 active:scale-95 text-white font-medium text-xs rounded-xl transition-all min-h-[44px] touch-manipulation"
-                >
-                  <span>Configure WhatsApp Phone Number</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
+        {/* Clean Human Greeting */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              {plots.length === 0 ? `Welcome, ${agentName}! 👋` : `Welcome back, ${agentName}! 👋`}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              {plots.length === 0
+                ? "Your land sales command center is ready. Let's add your first parcel."
+                : "Here is your active property portfolio and sales pipeline."}
+            </p>
+          </div>
+        </div>
 
         {/* KPI Summary Cards */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -423,7 +348,10 @@ export default function DashboardPage() {
             </div>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-stretch sm:self-auto min-h-[44px]">
+            <div
+              id="tour-view-mode"
+              className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-stretch sm:self-auto min-h-[44px]"
+            >
               <button
                 onClick={() => setViewMode('LIST')}
                 className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -450,7 +378,10 @@ export default function DashboardPage() {
           </div>
 
           {/* Status Tabs adhering to Apple HIG (min 44x44pt) */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <div
+            id="tour-status-filters"
+            className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"
+          >
             {['ALL', 'AVAILABLE', 'PENDING', 'SOLD'].map((st) => (
               <button
                 key={st}
@@ -734,6 +665,12 @@ export default function DashboardPage() {
         }}
       />
     )}
+
+    {/* Interactive Apple TipKit-Style Guided Tour */}
+    <AgentOnboardingTour
+      isOpen={isTourOpen}
+      onClose={() => setIsTourOpen(false)}
+    />
   </div>
   );
 }

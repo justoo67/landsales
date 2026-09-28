@@ -6,9 +6,13 @@ import { Map, Plus, Settings, LogOut, Layers } from 'lucide-react';
 
 interface AgentNavbarProps {
   agentName?: string;
+  onStartTour?: () => void;
 }
 
-export default function AgentNavbar({ agentName = 'Agent' }: AgentNavbarProps) {
+export default function AgentNavbar({
+  agentName = 'Agent',
+  onStartTour,
+}: AgentNavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -45,7 +49,23 @@ export default function AgentNavbar({ agentName = 'Agent' }: AgentNavbarProps) {
 
         {/* Action Controls adhering to Apple HIG (min 44x44pt) */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick Interactive Guided Tour Trigger */}
+          {onStartTour && isDashboard && (
+            <button
+              onClick={onStartTour}
+              type="button"
+              className="flex items-center justify-center w-11 h-11 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all touch-manipulation active:scale-95"
+              title="Quick Guided Tour"
+              aria-label="Quick Guided Tour"
+            >
+              <span className="text-xs font-bold border border-slate-300 rounded-lg px-1.5 py-0.5 hover:border-sky-500 hover:text-sky-600 transition-colors">
+                Tour
+              </span>
+            </button>
+          )}
+
           <Link
+            id="tour-add-plot"
             href="/dashboard/plots/new"
             className="flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-sm font-medium rounded-xl shadow-sm transition-all min-h-[44px] min-w-[44px] touch-manipulation"
           >
@@ -54,6 +74,7 @@ export default function AgentNavbar({ agentName = 'Agent' }: AgentNavbarProps) {
           </Link>
 
           <Link
+            id="tour-settings"
             href="/dashboard/settings"
             className={`flex items-center justify-center w-11 h-11 rounded-xl transition-all touch-manipulation active:scale-95 ${
               isSettings
