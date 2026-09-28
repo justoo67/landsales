@@ -83,6 +83,13 @@ export default function DashboardPage() {
     totalOutstanding: number;
   } | null>(null);
 
+  // Destructive Action Sheet State (Apple HIG action-sheets.md)
+  const [deletePlotTarget, setDeletePlotTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [isDeletingPlot, setIsDeletingPlot] = useState(false);
+
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
 
   const fetchPlots = async () => {
@@ -172,18 +179,26 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this plot listing?')) {
-      return;
-    }
+  const handleDeleteClick = (id: string, title: string) => {
+    setDeletePlotTarget({ id, title });
+  };
 
+  const confirmDelete = async () => {
+    if (!deletePlotTarget) return;
+    setIsDeletingPlot(true);
     try {
-      const res = await fetch(`/api/plots/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/plots/${deletePlotTarget.id}`, { method: 'DELETE' });
       if (res.ok) {
-        setPlots((prev) => prev.filter((p) => p.id !== id));
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(20);
+        }
+        setPlots((prev) => prev.filter((p) => p.id !== deletePlotTarget.id));
+        setDeletePlotTarget(null);
       }
     } catch (err) {
       console.error('Delete plot error:', err);
+    } finally {
+      setIsDeletingPlot(false);
     }
   };
 
@@ -191,6 +206,9 @@ export default function DashboardPage() {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const shareUrl = `${origin}/p/${id}`;
     navigator.clipboard.writeText(shareUrl);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(12);
+    }
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2500);
   };
@@ -615,7 +633,7 @@ export default function DashboardPage() {
 
                       {/* Delete Button */}
                       <button
-                        onClick={() => handleDelete(plot.id)}
+                        onClick={() => handleDeleteClick(plot.id, plot.title)}
                         className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all touch-manipulation active:scale-95"
                         title="Delete"
                         aria-label="Delete Plot"
@@ -671,6 +689,41 @@ export default function DashboardPage() {
       isOpen={isTourOpen}
       onClose={() => setIsTourOpen(false)}
     />
+
+    {/* Destructive Action Sheet (Apple HIG action-sheets.md) */}
+    {deletePlotTarget && (
+      <div className="fixed inset-0 z-[1100] bg-slate-900/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+        <div className="w-full max-w-sm bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="text-center space-y-1.5 pt-1">
+            <h3 className="text-base font-bold text-slate-900">
+              Delete Property Listing?
+            </h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Are you sure you want to permanently delete <strong className="text-slate-700">&ldquo;{deletePlotTarget.title}&rdquo;</strong>? This action cannot be undone.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              disabled={isDeletingPlot}
+              onClick={confirmDelete}
+              className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-semibold text-sm rounded-2xl shadow-md shadow-rose-600/20 transition-all min-h-[48px] touch-manipulation disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isDeletingPlot ? 'Deleting...' : 'Delete Listing'}
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingPlot}
+              onClick={() => setDeletePlotTarget(null)}
+              className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-700 font-semibold text-sm rounded-2xl transition-all min-h-[48px] touch-manipulation"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
   );
 }

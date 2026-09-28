@@ -1,9 +1,23 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000');
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl),
   title: "LandSales Assistant",
   description: "Lightweight field tool for land sales agents to map, catalog, and share property listings.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -17,6 +31,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: "#ffffff",
 };
+
+import OfflineBanner from "@/components/common/OfflineBanner";
 
 export default function RootLayout({
   children,
@@ -34,6 +50,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 selection:bg-sky-100 selection:text-sky-900">
+        <OfflineBanner />
         {children}
       </body>
     </html>

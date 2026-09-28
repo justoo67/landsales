@@ -5,7 +5,6 @@ import { prisma } from '@/lib/prisma';
 import {
   MapPin,
   CheckCircle2,
-  Share2,
   Calendar,
   Compass,
   MessageCircle,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react';
 import ClientPhotoGallery from '@/components/client/ClientPhotoGallery';
 import ClientListingMap from '@/components/client/ClientListingMap';
+import ShareButton from '@/components/client/ShareButton';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -44,20 +44,36 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `${plot.title} — ${priceText} (${plot.status})`;
   const description = `${plot.sizePreset} land parcel. ${plot.roadAccess || ''} road access, ${plot.waterSource || ''} water, ${plot.electricity || ''} power.`;
 
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000');
+
+  const absoluteImageUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${baseUrl.replace(/\/$/, '')}${path.startsWith('/') ? '' : '/'}${path}`;
+  };
+
+  const ogImages = photos.length > 0 ? [absoluteImageUrl(photos[0])] : [];
+
   return {
     title,
     description,
     openGraph: {
       title,
       description,
-      images: photos.length > 0 ? [photos[0]] : [],
+      images: ogImages,
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: photos.length > 0 ? [photos[0]] : [],
+      images: ogImages,
     },
   };
 }
@@ -134,30 +150,37 @@ export default async function ClientShowcasePage({ params }: PageProps) {
               Verified Land Listing
             </span>
           </div>
-          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${
-              plot.status === 'AVAILABLE'
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                : plot.status === 'PENDING'
-                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                plot.status === 'AVAILABLE'
-                  ? 'bg-emerald-500'
-                  : plot.status === 'PENDING'
-                  ? 'bg-amber-500'
-                  : 'bg-rose-500'
-              }`}
+          <div className="flex items-center gap-2.5">
+            <ShareButton
+              title={plot.title}
+              priceText={formattedPrice}
+              variant="header"
             />
-            {plot.status === 'AVAILABLE'
-              ? 'Available'
-              : plot.status === 'PENDING'
-              ? 'Under Offer'
-              : 'Sold'}
-          </span>
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${
+                plot.status === 'AVAILABLE'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                  : plot.status === 'PENDING'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  plot.status === 'AVAILABLE'
+                    ? 'bg-emerald-500'
+                    : plot.status === 'PENDING'
+                    ? 'bg-amber-500'
+                    : 'bg-rose-500'
+                }`}
+              />
+              {plot.status === 'AVAILABLE'
+                ? 'Available'
+                : plot.status === 'PENDING'
+                ? 'Under Offer'
+                : 'Sold'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -302,6 +325,30 @@ export default async function ClientShowcasePage({ params }: PageProps) {
             longitude={plot.longitude}
             title={plot.title}
           />
+
+          {/* Turn-by-Turn Driving Navigation (Apple Maps / Google Maps) */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
+            <a
+              href={`https://maps.apple.com/?daddr=${plot.latitude},${plot.longitude}&q=${encodeURIComponent(plot.title)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 hover:bg-black text-white text-xs font-semibold rounded-2xl shadow-sm transition-all touch-manipulation active:scale-[0.98] min-h-[44px]"
+            >
+              <Compass className="w-4 h-4 text-sky-400" />
+              <span>Open in Apple Maps</span>
+            </a>
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${plot.latitude},${plot.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-2xl transition-all touch-manipulation active:scale-[0.98] min-h-[44px] flex items-center justify-center gap-1.5"
+              title="Open in Google Maps"
+              aria-label="Open in Google Maps"
+            >
+              <MapPin className="w-3.5 h-3.5 text-slate-500" />
+              <span>Google Maps</span>
+            </a>
+          </div>
         </div>
 
         {/* Verified Buyer Review & Social Proof */}
@@ -362,11 +409,18 @@ export default async function ClientShowcasePage({ params }: PageProps) {
 
           <a
             href={`tel:${agent?.whatsappNumber || ''}`}
+            aria-label={`Call agent ${agentName}`}
             className="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 flex items-center justify-center transition-all min-h-[44px] min-w-[44px] touch-manipulation flex-shrink-0"
             title="Call Agent"
           >
             <Phone className="w-5 h-5" />
           </a>
+
+          <ShareButton
+            title={plot.title}
+            priceText={formattedPrice}
+            variant="floating"
+          />
         </div>
       </footer>
     </div>

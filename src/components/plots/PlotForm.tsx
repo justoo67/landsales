@@ -18,6 +18,7 @@ import {
   Sliders,
 } from 'lucide-react';
 import Link from 'next/link';
+import { triggerHaptic } from '@/lib/haptics';
 
 const DynamicLocationPicker = dynamic(
   () => import('@/components/map/LocationPickerMap'),
@@ -171,6 +172,54 @@ export default function PlotForm({ initialData, isEditing = false }: PlotFormPro
     setCustomAttributes((prev) => prev.filter((attr) => attr.id !== id));
   };
 
+  const uploadFileDirect = async (file: File): Promise<string> => {
+    // 1. Try direct browser-to-R2 presigned upload (bypasses serverless payload limits)
+    try {
+      const presignedRes = await fetch('/api/upload/presigned', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+        }),
+      });
+
+      if (presignedRes.ok) {
+        const presignedData = await presignedRes.json();
+        if (!presignedData.directFallback && presignedData.uploadUrl) {
+          const uploadRes = await fetch(presignedData.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': file.type || 'application/octet-stream',
+            },
+            body: file,
+          });
+
+          if (uploadRes.ok) {
+            return presignedData.publicUrl;
+          }
+          console.warn('Presigned PUT failed, falling back to /api/upload', uploadRes.status);
+        }
+      }
+    } catch (presignedErr) {
+      console.warn('Presigned upload attempt error:', presignedErr);
+    }
+
+    // 2. Fallback to /api/upload route
+    const body = new FormData();
+    body.append('file', file);
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body,
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to upload file');
+    }
+    const data = await res.json();
+    return data.url;
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -181,25 +230,15 @@ export default function PlotForm({ initialData, isEditing = false }: PlotFormPro
     try {
       const uploadedUrls: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const body = new FormData();
-        body.append('file', file);
-
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          uploadedUrls.push(data.url);
-        }
+        const url = await uploadFileDirect(files[i]);
+        uploadedUrls.push(url);
       }
 
       setFormData((prev) => ({
         ...prev,
         photos: [...prev.photos, ...uploadedUrls],
       }));
+      triggerHaptic('success');
     } catch (err) {
       console.error('Photo upload error:', err);
       setError('Failed to upload image. Please try again.');
@@ -216,32 +255,22 @@ export default function PlotForm({ initialData, isEditing = false }: PlotFormPro
     setError(null);
 
     try {
-      const body = new FormData();
-      body.append('file', file);
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setFormData((prev) => ({
-          ...prev,
-          videoUrl: data.url,
-        }));
-      } else {
-        throw new Error('Video upload failed');
-      }
+      const url = await uploadFileDirect(file);
+      setFormData((prev) => ({
+        ...prev,
+        videoUrl: url,
+      }));
+      triggerHaptic('success');
     } catch (err) {
       console.error('Video upload error:', err);
-      setError('Failed to upload video.');
+      setError('Failed to upload video. Please try again.');
     } finally {
       setUploadingVideo(false);
     }
   };
 
   const removePhoto = (index: number) => {
+    triggerHaptic('light');
     setFormData((prev) => ({
       ...prev,
       photos: prev.photos.filter((_, i) => i !== index),
@@ -286,6 +315,7 @@ export default function PlotForm({ initialData, isEditing = false }: PlotFormPro
         throw new Error(data.error || 'Failed to save plot');
       }
 
+      triggerHaptic('success');
       router.push('/dashboard');
       router.refresh();
     } catch (err: unknown) {
