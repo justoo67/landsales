@@ -101,6 +101,7 @@ export async function GET(req: Request) {
         email: agent.email,
         agentId: agent.id,
         name: agent.agentName,
+        avatarUrl: googleUser.picture || undefined,
       });
 
       return NextResponse.redirect(new URL('/dashboard?welcome=true', req.url));

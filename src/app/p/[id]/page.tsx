@@ -144,10 +144,10 @@ export default async function ClientShowcasePage({ params }: PageProps) {
       {/* Header Bar */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/85 border-b border-slate-200/80 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-              Verified Land Listing
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+            <span className="text-xs font-bold text-slate-900 truncate max-w-[160px] sm:max-w-[280px]">
+              {plot.title}
             </span>
           </div>
           <div className="flex items-center gap-2.5">

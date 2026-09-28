@@ -17,6 +17,7 @@ export async function GET() {
         email: agent.email,
         whatsappNumber: agent.whatsappNumber,
         customGreeting: agent.customGreeting,
+        avatarUrl: session.avatarUrl || null,
       },
     });
   } catch (err) {

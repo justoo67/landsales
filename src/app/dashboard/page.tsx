@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<'LIST' | 'MAP'>('LIST');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [agentName, setAgentName] = useState('Agent');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Phase 2: Sales Ledger & Installment Modals State
   const [saleDrawerTarget, setSaleDrawerTarget] = useState<{
@@ -113,6 +114,9 @@ export default function DashboardPage() {
         const data = await res.json();
         if (data.profile?.agentName) {
           setAgentName(data.profile.agentName);
+        }
+        if (data.profile?.avatarUrl) {
+          setAvatarUrl(data.profile.avatarUrl);
         }
       }
     } catch (err) {
@@ -238,6 +242,7 @@ export default function DashboardPage() {
     <div className="min-h-dvh flex flex-col bg-slate-50">
       <AgentNavbar
         agentName={agentName}
+        avatarUrl={avatarUrl}
         onStartTour={() => setIsTourOpen(true)}
       />
 

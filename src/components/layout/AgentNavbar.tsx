@@ -1,36 +1,36 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { Map, Plus, Settings, LogOut, Layers } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Plus, Settings, Layers } from 'lucide-react';
 
 interface AgentNavbarProps {
   agentName?: string;
+  avatarUrl?: string | null;
   onStartTour?: () => void;
+}
+
+function getInitials(name: string): string {
+  if (!name) return 'A';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
 }
 
 export default function AgentNavbar({
   agentName = 'Agent',
+  avatarUrl,
   onStartTour,
 }: AgentNavbarProps) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/login');
-      router.refresh();
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
-  };
 
   const isDashboard = pathname === '/dashboard';
   const isSettings = pathname === '/dashboard/settings';
 
   return (
-    <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/85 border-b border-slate-200/80 transition-all">
+    <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/85 border-b border-slate-200/80 transition-all pt-safe">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand / Agent info */}
         <Link href="/dashboard" className="flex items-center gap-2.5 touch-manipulation group">
@@ -54,11 +54,11 @@ export default function AgentNavbar({
             <button
               onClick={onStartTour}
               type="button"
-              className="flex items-center justify-center w-11 h-11 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all touch-manipulation active:scale-95"
+              className="hidden md:flex items-center justify-center w-11 h-11 text-slate-500 hover:text-sky-600 hover:bg-slate-100 rounded-xl transition-all touch-manipulation active:scale-95"
               title="Quick Guided Tour"
               aria-label="Quick Guided Tour"
             >
-              <span className="text-xs font-bold border border-slate-300 rounded-lg px-1.5 py-0.5 hover:border-sky-500 hover:text-sky-600 transition-colors">
+              <span className="text-xs font-bold border border-slate-300 rounded-lg px-2 py-0.5 hover:border-sky-500 hover:text-sky-600 transition-colors">
                 Tour
               </span>
             </button>
@@ -76,24 +76,28 @@ export default function AgentNavbar({
           <Link
             id="tour-settings"
             href="/dashboard/settings"
-            className={`flex items-center justify-center w-11 h-11 rounded-xl transition-all touch-manipulation active:scale-95 ${
+            className={`flex items-center gap-1.5 p-1 rounded-xl transition-all touch-manipulation active:scale-95 min-h-[44px] ${
               isSettings
-                ? 'bg-slate-100 text-sky-600'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-slate-100 ring-2 ring-sky-500/20'
+                : 'hover:bg-slate-100'
             }`}
-            title="Agent Profile Settings"
+            title={`Settings (${agentName})`}
+            aria-label={`Settings (${agentName})`}
           >
-            <Settings className="w-5 h-5" />
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={agentName}
+                referrerPolicy="no-referrer"
+                className="w-8 h-8 rounded-full object-cover ring-2 ring-sky-500/30 shadow-sm"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                {getInitials(agentName)}
+              </div>
+            )}
+            <Settings className="w-4 h-4 text-slate-400 hover:text-slate-700 hidden sm:block mr-1" />
           </Link>
-
-          <button
-            onClick={handleLogout}
-            type="button"
-            className="flex items-center justify-center w-11 h-11 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all touch-manipulation active:scale-95"
-            title="Log Out"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
         </div>
       </div>
     </header>

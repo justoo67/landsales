@@ -13,6 +13,7 @@ export interface SessionPayload {
   email: string;
   agentId: string;
   name: string;
+  avatarUrl?: string;
 }
 
 export async function createSession(payload: SessionPayload) {

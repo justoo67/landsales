@@ -17,15 +17,75 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #090d16;
-    --foreground: #f8fafc;
-    --card: #0f172a;
-    --card-foreground: #f8fafc;
-    --border: #1e293b;
-    --muted: #94a3b8;
-    --muted-background: #1e293b;
+  :root:not([data-theme="light"]), html:not([data-theme="light"]) {
+    --color-slate-50: #0b0f19;
+    --color-slate-100: #151f33;
+    --color-slate-200: #23304a;
+    --color-slate-300: #334155;
+    --color-slate-400: #64748b;
+    --color-slate-500: #94a3b8;
+    --color-slate-600: #cbd5e1;
+    --color-slate-700: #e2e8f0;
+    --color-slate-800: #f1f5f9;
+    --color-slate-900: #f8fafc;
+    --color-white: #111827;
+    color-scheme: dark;
   }
+
+  html:not([data-theme="light"]), html:not([data-theme="light"]) body {
+    background-color: #0b0f19 !important;
+    color: #f8fafc;
+  }
+
+  html:not([data-theme="light"]) .leaflet-tile {
+    filter: brightness(0.85) invert(1) contrast(1.2) hue-rotate(200deg) saturate(0.35);
+  }
+}
+
+:root[data-theme="dark"], html.dark, html[data-theme="dark"], .dark {
+  --color-slate-50: #0b0f19;
+  --color-slate-100: #151f33;
+  --color-slate-200: #23304a;
+  --color-slate-300: #334155;
+  --color-slate-400: #64748b;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #f1f5f9;
+  --color-slate-900: #f8fafc;
+  --color-white: #111827;
+  color-scheme: dark;
+}
+
+html.dark, html.dark body,
+html[data-theme="dark"], html[data-theme="dark"] body {
+  background-color: #0b0f19 !important;
+  color: #f8fafc;
+}
+
+html.dark .leaflet-tile,
+html[data-theme="dark"] .leaflet-tile {
+  filter: brightness(0.85) invert(1) contrast(1.2) hue-rotate(200deg) saturate(0.35);
+}
+
+:root[data-theme="light"], html[data-theme="light"] {
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-white: #ffffff;
+  color-scheme: light;
+}
+
+html[data-theme="light"], html[data-theme="light"] body {
+  background-color: #f8fafc !important;
+  color: #0f172a;
 }
 
 @theme inline {

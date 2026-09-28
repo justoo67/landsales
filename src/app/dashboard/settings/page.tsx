@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import AgentNavbar from '@/components/layout/AgentNavbar';
-import { User, Phone, MessageSquare, Check, AlertCircle } from 'lucide-react';
+import ThemeSegmentedControl from '@/components/common/ThemeSegmentedControl';
+import { User, Phone, MessageSquare, Check, AlertCircle, Palette, LogOut } from 'lucide-react';
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [agentName, setAgentName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [customGreeting, setCustomGreeting] = useState('');
   const [email, setEmail] = useState('');
@@ -27,6 +31,7 @@ export default function SettingsPage() {
             p.customGreeting || "Hi! I'm inquiring about [Plot Title]. Is it still available?"
           );
           setEmail(p.email || '');
+          setAvatarUrl(p.avatarUrl || null);
         }
       } catch (err) {
         console.error('Settings load error:', err);
@@ -71,18 +76,48 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
   return (
     <div className="min-h-dvh flex flex-col bg-slate-50">
-      <AgentNavbar agentName={agentName} />
+      <AgentNavbar agentName={agentName} avatarUrl={avatarUrl} />
 
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-6 pb-20">
         <div className="mb-6">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Agent Profile & WhatsApp Settings
+            Agent Profile & Settings
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Configure your contact details so prospective clients reach your WhatsApp directly.
+            Manage your personal branding, interface appearance, and client WhatsApp routing.
           </p>
+        </div>
+
+        {/* Appearance Row adhering to Apple HIG */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-5 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
+              <Palette className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 leading-tight">
+                Appearance
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Sync with device theme or choose manually.
+              </p>
+            </div>
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-[270px]">
+            <ThemeSegmentedControl />
+          </div>
         </div>
 
         {saved && (
@@ -182,6 +217,26 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
+
+        {/* Account Session & Sign Out */}
+        <div className="mt-6 bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+              Agent Portal Session
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Signed in as <strong className="text-slate-700">{email || agentName}</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200/80 transition-all min-h-[44px] touch-manipulation active:scale-98"
+          >
+            <LogOut className="w-4 h-4 text-rose-600" />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </main>
     </div>
   );
