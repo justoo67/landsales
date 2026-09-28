@@ -267,7 +267,7 @@ export default function DashboardPage() {
                   </div>
                   <h4 className="text-sm font-bold text-white">Pin Your Plot</h4>
                   <p className="text-xs text-sky-100 mt-1 leading-normal">
-                    Drop GPS coordinates and boundary markers on OpenStreetMap.
+                    Pin exact GPS coordinates on the interactive OpenStreetMap.
                   </p>
                 </div>
 
@@ -485,7 +485,7 @@ export default function DashboardPage() {
                 Add Your First Property
               </h3>
               <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
-                Your catalog is currently empty. List your first plot to pin GPS boundaries, upload phone media, and send interactive WhatsApp presentations to clients.
+                Your catalog is currently empty. List your first plot to pin its GPS location, upload phone media, and send interactive WhatsApp presentations to clients.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
                 <Link
