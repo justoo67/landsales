@@ -96,6 +96,10 @@ export default function DashboardPage() {
   const fetchPlots = async () => {
     try {
       const res = await fetch('/api/plots');
+      if (res.status === 401) {
+        window.location.href = '/login';
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setPlots(data.plots || []);
@@ -110,6 +114,10 @@ export default function DashboardPage() {
   const fetchProfile = async () => {
     try {
       const res = await fetch('/api/settings');
+      if (res.status === 401) {
+        window.location.href = '/login';
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         if (data.profile?.agentName) {

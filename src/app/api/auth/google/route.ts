@@ -78,10 +78,15 @@ export async function GET(req: Request) {
         .filter(Boolean);
 
       if (allowedEmails.length > 0 && !allowedEmails.includes(googleUser.email.toLowerCase())) {
-        console.warn(`Unauthorized Google sign-in attempt from: ${googleUser.email}`);
-        return NextResponse.redirect(
-          new URL('/login?error=UnauthorizedAccountNotAllowed', req.url)
-        );
+        const existingAgent = await prisma.agentProfile.findUnique({
+          where: { email: googleUser.email.toLowerCase() },
+        });
+        if (!existingAgent) {
+          console.warn(`Unauthorized Google sign-in attempt from: ${googleUser.email}`);
+          return NextResponse.redirect(
+            new URL('/login?error=UnauthorizedAccountNotAllowed', req.url)
+          );
+        }
       }
 
       await ensureDefaultAgent();

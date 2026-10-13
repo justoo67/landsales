@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AgentNavbar from '@/components/layout/AgentNavbar';
 import ThemeSegmentedControl from '@/components/common/ThemeSegmentedControl';
-import { User, Phone, MessageSquare, Check, AlertCircle, Palette, LogOut } from 'lucide-react';
+import { User, Phone, Check, AlertCircle, Palette, LogOut, Lock, KeyRound } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -13,6 +14,14 @@ export default function SettingsPage() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [customGreeting, setCustomGreeting] = useState('');
   const [email, setEmail] = useState('');
+  const [hasPassword, setHasPassword] = useState(false);
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -22,6 +31,10 @@ export default function SettingsPage() {
     async function loadSettings() {
       try {
         const res = await fetch('/api/settings');
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           const p = data.profile;
@@ -32,6 +45,7 @@ export default function SettingsPage() {
           );
           setEmail(p.email || '');
           setAvatarUrl(p.avatarUrl || null);
+          setHasPassword(Boolean(p.hasPassword));
         }
       } catch (err) {
         console.error('Settings load error:', err);
@@ -40,13 +54,28 @@ export default function SettingsPage() {
       }
     }
     loadSettings();
-  }, []);
+  }, [router]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     setSaved(false);
+
+    if (newPassword) {
+      if (newPassword.length < 8) {
+        setError('New password must be at least 8 characters long');
+        setSaving(false);
+        triggerHaptic('warning');
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setError('New passwords do not match');
+        setSaving(false);
+        triggerHaptic('warning');
+        return;
+      }
+    }
 
     try {
       const res = await fetch('/api/settings', {
@@ -56,16 +85,33 @@ export default function SettingsPage() {
           agentName,
           whatsappNumber,
           customGreeting,
+          ...(newPassword
+            ? {
+                currentPassword: currentPassword || undefined,
+                newPassword,
+              }
+            : {}),
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        throw new Error('Failed to update settings');
+        throw new Error(data.error || 'Failed to update settings');
       }
 
+      triggerHaptic('success');
       setSaved(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setShowPasswordSection(false);
+      if (data.profile?.hasPassword) {
+        setHasPassword(true);
+      }
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {
+      triggerHaptic('warning');
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -77,6 +123,7 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
+    triggerHaptic('light');
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/login');
@@ -85,6 +132,17 @@ export default function SettingsPage() {
       console.error('Logout error:', err);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-dvh flex flex-col bg-slate-50">
+        <AgentNavbar agentName={agentName || 'Agent'} avatarUrl={avatarUrl} />
+        <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-16 text-center text-slate-400 text-sm">
+          Loading settings...
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh flex flex-col bg-slate-50">
@@ -96,7 +154,7 @@ export default function SettingsPage() {
             Agent Profile & Settings
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Manage your personal branding, interface appearance, and client WhatsApp routing.
+            Manage your personal branding, security credentials, appearance, and client WhatsApp routing.
           </p>
         </div>
 
@@ -137,16 +195,16 @@ export default function SettingsPage() {
         <form onSubmit={handleSave} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Authorized Account Email
+              Account Email
             </label>
             <input
               type="text"
               disabled
               value={email}
-              className="w-full px-3.5 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed text-sm"
+              className="w-full px-3.5 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed text-base min-h-[44px]"
             />
             <p className="text-[11px] text-slate-400 mt-1">
-              Guarded by single-agent email allowlist.
+              Your registered agent account email address.
             </p>
           </div>
 
@@ -161,7 +219,7 @@ export default function SettingsPage() {
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
                 placeholder="e.g. John Mwangi"
-                className="w-full px-3.5 py-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 min-h-[44px]"
+                className="w-full px-3.5 py-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 text-base min-h-[44px]"
               />
               <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -179,7 +237,7 @@ export default function SettingsPage() {
                 value={whatsappNumber}
                 onChange={(e) => setWhatsappNumber(e.target.value)}
                 placeholder="+254712345678"
-                className="w-full px-3.5 py-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 min-h-[44px]"
+                className="w-full px-3.5 py-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 text-base min-h-[44px]"
               />
               <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -198,7 +256,7 @@ export default function SettingsPage() {
                 value={customGreeting}
                 onChange={(e) => setCustomGreeting(e.target.value)}
                 placeholder="Hi! I'm inquiring about [Plot Title] listed for [Price]. Is it still available?"
-                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900"
+                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 text-base"
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
@@ -206,11 +264,85 @@ export default function SettingsPage() {
             </p>
           </div>
 
+          {/* Security & Password Section */}
+          <div className="pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setShowPasswordSection((prev) => !prev);
+              }}
+              className="flex items-center justify-between w-full py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-sky-600 transition-colors touch-manipulation cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-sky-600" />
+                <span>{hasPassword ? 'Change Password' : 'Set Password'}</span>
+              </span>
+              <span className="text-[11px] font-normal text-sky-600">
+                {showPasswordSection ? 'Hide' : 'Configure'}
+              </span>
+            </button>
+
+            {showPasswordSection && (
+              <div className="space-y-4 pt-3 mt-2 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80">
+                {hasPassword && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Current Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-3.5 py-3 pl-10 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 text-base min-h-[44px]"
+                      />
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      className="w-full px-3.5 py-3 pl-10 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 text-base min-h-[44px]"
+                    />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="Repeat new password"
+                      className="w-full px-3.5 py-3 pl-10 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-900 text-base min-h-[44px]"
+                    />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="pt-2">
             <button
               type="submit"
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-medium text-sm rounded-xl shadow-md transition-all min-h-[44px] touch-manipulation disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-md transition-all min-h-[48px] touch-manipulation disabled:opacity-50 cursor-pointer"
             >
               <Check className="w-4 h-4" />
               <span>{saving ? 'Saving...' : 'Save Settings'}</span>
@@ -231,7 +363,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200/80 transition-all min-h-[44px] touch-manipulation active:scale-98"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200/80 transition-all min-h-[44px] touch-manipulation active:scale-98 cursor-pointer"
           >
             <LogOut className="w-4 h-4 text-rose-600" />
             <span>Sign Out</span>

@@ -14,25 +14,33 @@ export async function POST(req: Request) {
       );
     }
 
-    await ensureDefaultAgent();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const allowedConfig = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
-    const allowedEmails = allowedConfig.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-    if (allowedEmails.length > 0 && !allowedEmails.includes(email.toLowerCase())) {
+    // Look up agent by email
+    let agent = await prisma.agentProfile.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    // If demo agent account isn't seeded yet, seed it automatically
+    if (!agent && (normalizedEmail === 'agent@example.com' || normalizedEmail === 'justinkirui3@gmail.com')) {
+      await ensureDefaultAgent();
+      agent = await prisma.agentProfile.findUnique({
+        where: { email: normalizedEmail },
+      });
+    }
+
+    if (!agent) {
       return NextResponse.json(
-        { error: 'Unauthorized: Not an approved agent account' },
-        { status: 403 }
+        { error: 'No account found with this email. Please check your credentials or create an account.' },
+        { status: 401 }
       );
     }
 
-    const agent = await prisma.agentProfile.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-
-    if (!agent || !agent.passwordHash) {
+    // Account created via Google OAuth only without a password
+    if (!agent.passwordHash) {
       return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
+        { error: 'This account was registered using Google sign-in. Please use "Continue with Google" to sign in.' },
+        { status: 400 }
       );
     }
 

@@ -44,3 +44,5 @@ prisma/dev.db-journal
 # uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+.omo
