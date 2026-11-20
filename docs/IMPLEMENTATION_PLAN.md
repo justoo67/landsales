@@ -77,8 +77,8 @@ SMS gateway, AI pricing, full offline sync, buyer invoicing, document e-signatur
 |---|---|---|---|
 | 0 | Foundations: migrations, money, soft delete, auth, tests | 1–2 d | **done** |
 | 1 | Contacts, leads, inquiry capture, pipeline | 3–5 d | **done** |
-| 2 | Tasks, today view, follow-up logging | 2–4 d | next |
-| 3 | Site visits, documents | 2–3 d | planned |
+| 2 | Tasks, today view, follow-up logging | 2–4 d | **done** |
+| 3 | Site visits, documents | 2–3 d | next |
 | 4 | Comparables & price guidance | 3–4 d | planned |
 | 5 | Payments, commission, statements | 4–6 d | planned |
 | 6 | Test coverage, CI, export, launch polish | 2–3 d | planned |
@@ -283,15 +283,30 @@ model Task {
 }
 ```
 
-- [ ] `Task` CRUD + `/api/tasks`, `/api/tasks/:id/complete`.
-- [ ] `/dashboard/today` — overdue → due today → next 7 days (atomic-crm's
+- [x] `Task` CRUD + `/api/tasks`, `/api/tasks/:id/complete`.
+- [x] `/dashboard/today` — overdue → due today → next 7 days (atomic-crm's
       `nb_tasks` pending-count pattern).
-- [ ] Task creation from lead/plot/sale detail; completing writes an `Activity`.
-- [ ] One-tap log: call or WhatsApp opens the deep link and logs the touch on return.
-- [ ] Rule: a `Lead` cannot advance stage with `nextActionAt` empty (prompt for a task).
-- [ ] Badge count in the nav.
+- [x] Task creation from lead/plot/sale detail; completing writes an `Activity`.
+- [x] One-tap log: call or WhatsApp opens the deep link and logs the touch on return.
+- [x] Rule: a `Lead` cannot advance stage with `nextActionAt` empty (prompt for a task).
+- [x] Badge count in the nav.
 
 **Exit:** no lead exists without a next action, and every logged call appears in its timeline.
+
+### 6.1 Phase 2 implementation notes
+
+- `Task` uses a single set of nullable foreign keys (`leadId`, `plotId`, `contactId`, `saleId`)
+  instead of a join table; `syncLeadNextAction` mirrors the earliest open task onto
+  `Lead.nextActionAt` inside the same transaction as every create/complete/delete/snooze.
+- The stage rule only applies to **forward** moves (not to `LOST`/`CLOSED`), and accepts either
+  an open task or a directly-set `nextActionAt`. The detail sheet catches
+  `NEXT_ACTION_REQUIRED`, reveals a follow-up form, and retries the move after scheduling.
+- Quick actions on the lead (Call / WhatsApp) log the touch before navigating, so the timeline
+  stays honest without extra taps.
+- Today view groups open tasks into Overdue / Today / Next 7 days / Later, with one-tap complete
+  and a snooze-to-tomorrow button.
+- Files: `src/lib/{task-types,tasks,format}.ts`, `src/app/api/tasks/**`,
+  `src/components/tasks/*`, `src/app/dashboard/today/page.tsx`, nav badge in `AgentNavbar`.
 
 ---
 
@@ -486,3 +501,4 @@ agent-facing safety net.
 | 2026-11-20 | Plan created. Decisions D1–D7 recorded. Phase 0 started. |
 | 2026-11-20 | Phase 0 complete: Decimal money, soft delete + RESTRICT FK, versioned migrations, auth fail-closed, rate limiting, proxy guard, Vitest, lint at zero errors. |
 | 2026-11-20 | Phase 1 complete: Contacts/Leads/Activity, public inquiry capture with optional buyer details, lead board + detail timeline, stage rules, phone normalisation, sale backfill. |
+| 2026-11-20 | Phase 2 complete: Task model + migration 0005, Today view with overdue/today/upcoming, one-tap complete and snooze, next-action stage rule, nav badge. |

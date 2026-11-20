@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
+  CalendarClock,
   Check,
   ExternalLink,
   Loader2,
@@ -18,8 +19,9 @@ import {
 } from 'lucide-react';
 import { formatKes } from '@/lib/money';
 import { formatPhone, whatsappNumber } from '@/lib/phone';
-import { initials, timeAgo } from '@/lib/format';
+import { defaultFollowUpSlot, initials, timeAgo, toDateTimeInput } from '@/lib/format';
 import { triggerHaptic } from '@/lib/haptics';
+import { TASK_TYPES } from '@/lib/task-types';
 import {
   LEAD_STAGES,
   SOURCE_LABELS,
@@ -76,6 +78,10 @@ export default function LeadDetailSheet({
   });
   const [savingContact, setSavingContact] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [followUpAt, setFollowUpAt] = useState(defaultFollowUpSlot);
+  const [followUpType, setFollowUpType] = useState('CALL');
+  const [scheduling, setScheduling] = useState(false);
+  const [pendingStage, setPendingStage] = useState<LeadStage | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,6 +120,9 @@ export default function LeadDetailSheet({
 
       if (!res.ok) {
         setStageError(data.error || 'Could not change stage');
+        if (data.code === 'NEXT_ACTION_REQUIRED') {
+          setPendingStage(stage);
+        }
         if (data.code === 'LOST_REASON_REQUIRED') setLostPrompt(true);
         triggerHaptic('warning');
         return;
@@ -122,6 +131,7 @@ export default function LeadDetailSheet({
       triggerHaptic('success');
       setLostPrompt(false);
       setLostReason('');
+      setPendingStage(null);
       await load();
       onChanged();
     } catch {
@@ -174,6 +184,62 @@ export default function LeadDetailSheet({
       }
     } finally {
       setSavingContact(false);
+    }
+  };
+
+  const scheduleFollowUp = async (stage?: LeadStage | null) => {
+    if (!lead || !followUpAt) return;
+    setScheduling(true);
+    setStageError(null);
+
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Follow up with ${lead.contact.name.split(' ')[0]}`,
+          type: followUpType,
+          dueAt: new Date(followUpAt).toISOString(),
+          leadId: lead.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setStageError(data.error || 'Could not schedule the follow-up');
+        return;
+      }
+
+      triggerHaptic('success');
+      setPendingStage(null);
+      await load();
+      onChanged();
+
+      if (stage) {
+        await changeStage(stage);
+      }
+    } catch {
+      setStageError('Network error while scheduling');
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const logTouch = async (type: 'CALL' | 'WHATSAPP') => {
+    try {
+      await fetch(`/api/leads/${leadId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: type === 'CALL' ? 'Called the buyer' : 'Messaged the buyer on WhatsApp',
+          type,
+        }),
+      });
+      triggerHaptic('light');
+      await load();
+      onChanged();
+    } catch {
+      // Logging a touch must never block the call itself.
     }
   };
 
@@ -238,6 +304,7 @@ export default function LeadDetailSheet({
                   href={waHref}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => logTouch('WHATSAPP')}
                   className="flex items-center justify-center gap-2 px-3 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-2xl min-h-[46px] touch-manipulation"
                 >
                   <MessageCircle className="w-4 h-4" />
@@ -245,6 +312,7 @@ export default function LeadDetailSheet({
                 </a>
                 <a
                   href={`tel:${lead.contact.phone}`}
+                  onClick={() => logTouch('CALL')}
                   className="flex items-center justify-center gap-2 px-3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-2xl min-h-[46px] touch-manipulation"
                 >
                   <Phone className="w-4 h-4" />
@@ -352,6 +420,77 @@ export default function LeadDetailSheet({
                   </div>
                 </section>
               )}
+
+              {/* Next follow-up */}
+              <section
+                className={`rounded-2xl border p-3.5 space-y-2.5 ${
+                  pendingStage
+                    ? 'bg-amber-50 border-amber-300'
+                    : 'bg-white border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <CalendarClock className="w-3.5 h-3.5" />
+                    Next follow-up
+                  </h3>
+                  {lead.nextActionAt && (
+                    <span className="text-[11px] font-semibold text-sky-700">
+                      {toDateTimeInput(lead.nextActionAt).replace('T', ' · ')}
+                    </span>
+                  )}
+                </div>
+
+                {pendingStage && (
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    Schedule a follow-up to move this lead to{' '}
+                    <strong>{pendingStage.toLowerCase()}</strong>.
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-1.5">
+                  {TASK_TYPES.filter((option) =>
+                    ['CALL', 'WHATSAPP', 'SITE_VISIT', 'FOLLOW_UP'].includes(option.value)
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setFollowUpType(option.value)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border min-h-[34px] touch-manipulation ${
+                        followUpType === option.value
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="datetime-local"
+                    value={followUpAt}
+                    onChange={(event) => setFollowUpAt(event.target.value)}
+                    aria-label="Follow-up date and time"
+                    className="flex-1 min-w-0 px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => scheduleFollowUp(pendingStage)}
+                    disabled={scheduling || !followUpAt}
+                    className="px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold min-h-[40px] disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
+                  >
+                    {scheduling ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : pendingStage ? (
+                      'Schedule & move'
+                    ) : (
+                      'Schedule'
+                    )}
+                  </button>
+                </div>
+              </section>
 
               {/* Plot of interest */}
               <section className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">

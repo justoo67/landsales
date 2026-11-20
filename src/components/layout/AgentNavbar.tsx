@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, Settings, Layers, Users } from 'lucide-react';
+import { Plus, Settings, Layers, Users, CalendarCheck } from 'lucide-react';
 
 interface AgentNavbarProps {
   agentName?: string;
@@ -25,10 +26,28 @@ export default function AgentNavbar({
   onStartTour,
 }: AgentNavbarProps) {
   const pathname = usePathname();
+  const [dueCount, setDueCount] = useState(0);
 
   const isDashboard = pathname === '/dashboard';
   const isLeads = pathname.startsWith('/dashboard/leads');
+  const isToday = pathname.startsWith('/dashboard/today');
   const isSettings = pathname === '/dashboard/settings';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch('/api/tasks')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.summary) return;
+        setDueCount(data.summary.overdue + data.summary.today);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/85 border-b border-slate-200/80 transition-all pt-safe">
@@ -69,6 +88,21 @@ export default function AgentNavbar({
           >
             <Users className="w-3.5 h-3.5" />
             Leads
+          </Link>
+          <Link
+            href="/dashboard/today"
+            aria-current={isToday ? 'page' : undefined}
+            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors min-h-[36px] touch-manipulation ${
+              isToday ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <CalendarCheck className="w-3.5 h-3.5" />
+            Today
+            {dueCount > 0 && (
+              <span className="ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {dueCount > 9 ? '9+' : dueCount}
+              </span>
+            )}
           </Link>
         </nav>
 

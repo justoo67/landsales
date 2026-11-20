@@ -27,3 +27,49 @@ export function isOverdue(value: string | Date | null | undefined): boolean {
   const date = typeof value === 'string' ? new Date(value) : value;
   return date.getTime() < Date.now();
 }
+
+function startOfDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/** "Overdue · 12 Nov", "Today · 14:30", "Tomorrow · 09:00", "Fri 22 Nov". */
+export function dueLabel(value: string | Date): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '';
+
+  const now = new Date();
+  const today = startOfDay(now);
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (date.getTime() < today) {
+    return `Overdue · ${date.toLocaleDateString('en-KE', {
+      day: 'numeric',
+      month: 'short',
+    })}`;
+  }
+  if (date.getTime() < today + 86_400_000) return `Today · ${time}`;
+  if (date.getTime() < today + 172_800_000) return `Tomorrow · ${time}`;
+
+  return date.toLocaleDateString('en-KE', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+/** `datetime-local` value for a date, in the browser's timezone. */
+export function toDateTimeInput(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+}
+
+/** Default follow-up slot: tomorrow at 09:00. */
+export function defaultFollowUpSlot(): string {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(9, 0, 0, 0);
+  return toDateTimeInput(date);
+}

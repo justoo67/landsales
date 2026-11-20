@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
-import { leadJson, validateStageTransition, stageLabel } from '@/lib/leads';
+import { leadJson, validateStageTransition, stageLabel, stageOrder } from '@/lib/leads';
 
 export async function PATCH(
   req: Request,
@@ -31,6 +31,27 @@ export async function PATCH(
 
     if (!lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    }
+
+    // Moving forward without a next action is how leads go cold.
+    const movingForward =
+      stageOrder(stage) > stageOrder(lead.stage) && stage !== 'LOST' && stage !== 'CLOSED';
+
+    if (movingForward && !lead.nextActionAt) {
+      const openTask = await prisma.task.findFirst({
+        where: { leadId: id, doneAt: null },
+        select: { id: true },
+      });
+
+      if (!openTask) {
+        return NextResponse.json(
+          {
+            error: 'Schedule your next follow-up before moving this lead forward',
+            code: 'NEXT_ACTION_REQUIRED',
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const saleRecordId = lead.plot?.saleRecord?.id ?? null;

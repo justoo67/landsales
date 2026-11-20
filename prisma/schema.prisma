@@ -32,6 +32,7 @@ model Plot {
   saleRecord       SaleRecord?
   leads            Lead[]
   activities       Activity[]
+  tasks            Task[]
 
   @@index([deletedAt, status])
 }
@@ -59,6 +60,7 @@ model SaleRecord {
   review            BuyerReview?
   lead              Lead?
   activities        Activity[]
+  tasks             Task[]
 }
 
 model PaymentInstallment {
@@ -106,6 +108,7 @@ model Contact {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
   leads      Lead[]
+  tasks      Task[]
   activities Activity[]
 
   @@index([name])
@@ -129,6 +132,7 @@ model Lead {
   updatedAt    DateTime    @updatedAt
   saleId       String?     @unique
   sale         SaleRecord? @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  tasks        Task[]
   activities   Activity[]
 
   @@index([stage, index])
@@ -156,4 +160,28 @@ model Activity {
   @@index([createdAt])
   @@index([leadId, createdAt])
   @@index([contactId, createdAt])
+}
+
+model Task {
+  id        String      @id @default(cuid())
+  title     String
+  type      String      @default("FOLLOW_UP") // CALL|WHATSAPP|SMS|SITE_VISIT|DOCUMENT|PAYMENT|FOLLOW_UP
+  dueAt     DateTime
+  doneAt    DateTime?
+  priority  String      @default("NORMAL") // LOW|NORMAL|HIGH
+  notes     String?
+  contactId String?
+  contact   Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  leadId    String?
+  lead      Lead?       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  plotId    String?
+  plot      Plot?       @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  saleId    String?
+  sale      SaleRecord? @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([doneAt, dueAt])
+  @@index([leadId, doneAt])
+  @@index([plotId, doneAt])
 }
