@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createSession, ensureDefaultAgent } from '@/lib/auth';
+import { createSession, isAllowedAgentEmail } from '@/lib/auth';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -71,32 +71,22 @@ export async function GET(req: Request) {
         return NextResponse.redirect(new URL('/login?error=NoEmailFromGoogle', req.url));
       }
 
-      const allowedEnv = process.env.ALLOWED_AGENT_EMAIL || '';
-      const allowedEmails = allowedEnv
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean);
+      const googleEmail = googleUser.email.trim().toLowerCase();
 
-      if (allowedEmails.length > 0 && !allowedEmails.includes(googleUser.email.toLowerCase())) {
-        const existingAgent = await prisma.agentProfile.findUnique({
-          where: { email: googleUser.email.toLowerCase() },
-        });
-        if (!existingAgent) {
-          console.warn(`Unauthorized Google sign-in attempt from: ${googleUser.email}`);
-          return NextResponse.redirect(
-            new URL('/login?error=UnauthorizedAccountNotAllowed', req.url)
-          );
-        }
+      if (!isAllowedAgentEmail(googleEmail)) {
+        console.warn(`Unauthorized Google sign-in attempt from: ${googleEmail}`);
+        return NextResponse.redirect(
+          new URL('/login?error=UnauthorizedAccountNotAllowed', req.url)
+        );
       }
 
-      await ensureDefaultAgent();
       const agent = await prisma.agentProfile.upsert({
-        where: { email: googleUser.email.toLowerCase() },
+        where: { email: googleEmail },
         update: {
           agentName: googleUser.name || 'Agent',
         },
         create: {
-          email: googleUser.email.toLowerCase(),
+          email: googleEmail,
           agentName: googleUser.name || 'Agent',
           whatsappNumber: '+254700000000',
         },
@@ -118,7 +108,6 @@ export async function GET(req: Request) {
 
   // Local development fallback: if credentials are not yet configured in local dev, allow quick sign-in
   if (process.env.NODE_ENV !== 'production' && !clientId) {
-    await ensureDefaultAgent();
     const allowedConfig = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
     const defaultEmail = allowedConfig.split(',')[0].trim().toLowerCase();
     const agent =

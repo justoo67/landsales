@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Calendar,
   Compass,
-  MessageCircle,
   Phone,
   ShieldCheck,
   Star,
@@ -16,6 +15,8 @@ import {
 import ClientPhotoGallery from '@/components/client/ClientPhotoGallery';
 import ClientListingMap from '@/components/client/ClientListingMap';
 import ShareButton from '@/components/client/ShareButton';
+import InquireCta from '@/components/client/InquireCta';
+import { formatKes } from '@/lib/money';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -25,7 +26,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const plot = await prisma.plot.findUnique({ where: { id } });
 
-  if (!plot) {
+  if (!plot || plot.deletedAt) {
     return { title: 'Property Not Found' };
   }
 
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const priceText =
     plot.priceType === 'CONTACT_AGENT' || !plot.priceKes
       ? 'Price on Request'
-      : `KSh ${plot.priceKes.toLocaleString('en-KE')}`;
+      : formatKes(plot.priceKes.toNumber());
 
   const title = `${plot.title} — ${priceText} (${plot.status})`;
   const description = `${plot.sizePreset} land parcel. ${plot.roadAccess || ''} road access, ${plot.waterSource || ''} water, ${plot.electricity || ''} power.`;
@@ -91,7 +92,7 @@ export default async function ClientShowcasePage({ params }: PageProps) {
     },
   });
 
-  if (!plot) {
+  if (!plot || plot.deletedAt) {
     notFound();
   }
 
@@ -121,7 +122,7 @@ export default async function ClientShowcasePage({ params }: PageProps) {
   const formattedPrice =
     plot.priceType === 'CONTACT_AGENT' || !plot.priceKes
       ? 'Price on Request'
-      : `KSh ${plot.priceKes.toLocaleString('en-KE')}`;
+      : formatKes(plot.priceKes.toNumber());
 
   const sizeDisplay =
     plot.sizePreset === 'CUSTOM'
@@ -397,15 +398,11 @@ export default async function ClientShowcasePage({ params }: PageProps) {
       {/* Sticky Bottom WhatsApp Floating Bar adhering to Apple HIG */}
       <footer className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-2xl pb-safe">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2.5 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-semibold text-base rounded-2xl shadow-md shadow-emerald-600/30 transition-all min-h-[48px] touch-manipulation"
-          >
-            <MessageCircle className="w-5 h-5 fill-current" />
-            <span>Chat on WhatsApp</span>
-          </a>
+          <InquireCta
+            plotId={plot.id}
+            plotTitle={plot.title}
+            whatsappUrl={whatsappUrl}
+          />
 
           <a
             href={`tel:${agent?.whatsappNumber || ''}`}

@@ -9,58 +9,65 @@ generator client {
 }
 
 model Plot {
-  id              String   @id // Unguessable short ID (nanoid) e.g., "m8x2k4p9q1"
-  title           String
-  status          String   @default("AVAILABLE") // AVAILABLE, PENDING, SOLD
-  priceType       String   @default("FIXED") // FIXED, CONTACT_AGENT
-  priceKes        Float?
-  sizePreset      String   // "50x100", "40x80", "100x100", "ACRES", "HECTARES", "SQM", "CUSTOM"
-  sizeCustomValue String?  // e.g. "0.5", "2.5", "100x150 ft"
-  zoning          String?  // Residential, Agricultural, Commercial, Mixed
-  roadAccess      String?  // Tarmac, All-weather gravel, Dirt road, None
-  waterSource     String?  // Borehole, Piped county water, Natural stream, None
-  electricity     String?  // On-site, Nearby (<200m), Off-grid
-  description     String?
-  latitude        Float
-  longitude       Float
-  photos          String   // JSON string of photo URLs/paths
-  videoUrl        String?  // Video URL/path
+  id               String      @id // Unguessable short ID (nanoid) e.g., "m8x2k4p9q1"
+  title            String
+  status           String      @default("AVAILABLE") // AVAILABLE, PENDING, SOLD
+  priceType        String      @default("FIXED") // FIXED, CONTACT_AGENT
+  priceKes         Decimal?    @db.Decimal(14, 2)
+  sizePreset       String // "50x100", "40x80", "100x100", "ACRES", "HECTARES", "SQM", "CUSTOM"
+  sizeCustomValue  String? // e.g. "0.5", "2.5", "100x150 ft"
+  zoning           String? // Residential, Agricultural, Commercial, Mixed
+  roadAccess       String? // Tarmac, All-weather gravel, Dirt road, None
+  waterSource      String? // Borehole, Piped county water, Natural stream, None
+  electricity      String? // On-site, Nearby (<200m), Off-grid
+  description      String?
+  latitude         Float
+  longitude        Float
+  photos           String // JSON string of photo URLs/paths
+  videoUrl         String? // Video URL/path
   customAttributes String? // JSON string of custom key-value features
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  saleRecord      SaleRecord?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  deletedAt        DateTime? // Soft delete; payment history must survive
+  saleRecord       SaleRecord?
+  leads            Lead[]
+  activities       Activity[]
+
+  @@index([deletedAt, status])
 }
 
 model SaleRecord {
-  id              String               @id @default(cuid())
-  plotId          String               @unique
-  plot            Plot                 @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  id                String               @id @default(cuid())
+  plotId            String               @unique
+  plot              Plot                 @relation(fields: [plotId], references: [id], onDelete: Restrict)
   buyerName         String
   buyerPhone        String
-  buyerNationalId   String?              // National ID or KRA PIN for conveyancing
-  buyerCustomFields String?              // JSON string of custom key-value buyer details (e.g. Next of Kin, Advocate, etc.)
-  agreedPriceKes    Float
-  paymentType     String               @default("LUMP_SUM") // LUMP_SUM or INSTALLMENT
-  depositKes      Float                @default(0)
-  balanceKes      Float                @default(0)
-  nextDueDate     DateTime?
-  titleStatus     String               @default("DEPOSIT_PAID") 
+  buyerNationalId   String? // National ID or KRA PIN for conveyancing
+  buyerCustomFields String? // JSON string of custom key-value buyer details (e.g. Next of Kin, Advocate, etc.)
+  agreedPriceKes    Decimal              @db.Decimal(14, 2)
+  paymentType       String               @default("LUMP_SUM") // LUMP_SUM or INSTALLMENT
+  depositKes        Decimal              @default(0) @db.Decimal(14, 2)
+  balanceKes        Decimal              @default(0) @db.Decimal(14, 2)
+  nextDueDate       DateTime?
+  titleStatus       String               @default("DEPOSIT_PAID")
   // DEPOSIT_PAID -> AGREEMENT_SIGNED -> BALANCE_CLEARED -> LCB_CONSENT -> TITLE_ISSUED
-  notes           String?
-  closedAt        DateTime             @default(now())
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  installments    PaymentInstallment[]
-  review          BuyerReview?
+  notes             String?
+  closedAt          DateTime             @default(now())
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  installments      PaymentInstallment[]
+  review            BuyerReview?
+  lead              Lead?
+  activities        Activity[]
 }
 
 model PaymentInstallment {
   id           String     @id @default(cuid())
   saleRecordId String
   saleRecord   SaleRecord @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
-  amountKes    Float
+  amountKes    Decimal    @db.Decimal(14, 2)
   paymentDate  DateTime   @default(now())
-  reference    String?    // e.g., M-Pesa transaction code or bank ref
+  reference    String? // e.g., M-Pesa transaction code or bank ref
   notes        String?
   createdAt    DateTime   @default(now())
 }
@@ -85,4 +92,68 @@ model AgentProfile {
   customGreeting String?  @default("Hi! I'm inquiring about [Plot Title]. Is it still available?")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model Contact {
+  id         String     @id @default(cuid())
+  name       String
+  phone      String     @unique // normalised E.164, the dedupe key
+  altPhone   String?
+  email      String?
+  source     String     @default("FIELD") // WHATSAPP|REFERRAL|WALK_IN|SIGN|SOCIAL|REPEAT|INQUIRY|FIELD
+  tags       String[]
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  leads      Lead[]
+  activities Activity[]
+
+  @@index([name])
+}
+
+model Lead {
+  id           String      @id @default(cuid())
+  contactId    String
+  contact      Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  plotId       String?
+  plot         Plot?       @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  stage        String      @default("INQUIRY")
+  // INQUIRY|CONTACTED|SITE_VISIT|OFFER|DEPOSIT|CLOSED|LOST
+  index        Int         @default(0)
+  source       String      @default("FIELD")
+  budgetMinKes Decimal?    @db.Decimal(14, 2)
+  budgetMaxKes Decimal?    @db.Decimal(14, 2)
+  lostReason   String?
+  nextActionAt DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  saleId       String?     @unique
+  sale         SaleRecord? @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  activities   Activity[]
+
+  @@index([stage, index])
+  @@index([nextActionAt])
+  @@index([contactId])
+  @@index([plotId])
+}
+
+model Activity {
+  id        String      @id @default(cuid())
+  type      String
+  // INQUIRY|LEAD_CREATED|STAGE_CHANGED|NOTE|CALL|WHATSAPP|PAYMENT|DOCUMENT|STATUS
+  body      String?
+  metadata  Json?
+  contactId String?
+  contact   Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  leadId    String?
+  lead      Lead?       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  plotId    String?
+  plot      Plot?       @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  saleId    String?
+  sale      SaleRecord? @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  createdAt DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([leadId, createdAt])
+  @@index([contactId, createdAt])
 }

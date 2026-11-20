@@ -74,7 +74,7 @@ export default function SaleRecordDrawer({
 
   // Load existing deal info if plot already has a record (e.g. moving from PENDING to SOLD)
   useEffect(() => {
-    let isMounted = true;
+    const isMounted = true;
     async function loadExistingDeal() {
       try {
         const res = await fetch(`/api/plots/${plotId}/deal`);

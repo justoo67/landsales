@@ -1,13 +1,11 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { prisma } from './prisma';
-import bcrypt from 'bcryptjs';
+import { getTokenSecret, SESSION_COOKIE_NAME } from './jwt-secret';
+import type { AgentProfile } from '@prisma/client';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'landsales-super-secure-jwt-secret-key-2026-xyz'
-);
-
-const COOKIE_NAME = 'agent_session';
+const COOKIE_NAME = SESSION_COOKIE_NAME;
+const SESSION_DAYS = 30;
 
 export interface SessionPayload {
   email: string;
@@ -16,20 +14,44 @@ export interface SessionPayload {
   avatarUrl?: string;
 }
 
+function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+/** Emails allowed to sign in. Empty means "nobody" in production. */
+export function allowedAgentEmails(): string[] {
+  return (process.env.ALLOWED_AGENT_EMAIL || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAllowedAgentEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  const allowed = allowedAgentEmails();
+
+  if (allowed.length === 0) {
+    // Local development may run without an allowlist; production must not.
+    return !isProduction();
+  }
+
+  return allowed.includes(normalized);
+}
+
 export async function createSession(payload: SessionPayload) {
   const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('30d')
-    .sign(JWT_SECRET);
+    .setExpirationTime(`${SESSION_DAYS}d`)
+    .sign(getTokenSecret());
 
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProduction(),
     sameSite: 'lax',
     path: '/',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
   });
 
   return token;
@@ -42,7 +64,7 @@ export async function getSession(): Promise<SessionPayload | null> {
   if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getTokenSecret());
     return payload as unknown as SessionPayload;
   } catch (err) {
     console.error('Session verify error:', err);
@@ -55,31 +77,29 @@ export async function deleteSession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export async function ensureDefaultAgent() {
-  const allowedConfig = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
-  const defaultEmail = allowedConfig.split(',')[0].trim().toLowerCase();
+/**
+ * Resolve the agent profile for a signed-in session, creating a bare profile
+ * row if the account authenticated but has never completed setup.
+ *
+ * This replaces the old `ensureDefaultAgent`, which silently created an agent
+ * with a known password.
+ */
+export async function ensureAgentForSession(
+  session: SessionPayload
+): Promise<AgentProfile> {
+  const byId = session.agentId
+    ? await prisma.agentProfile.findUnique({ where: { id: session.agentId } })
+    : null;
+  if (byId) return byId;
 
-  let agent = await prisma.agentProfile.findUnique({
-    where: { email: defaultEmail },
+  const email = session.email.trim().toLowerCase();
+  const byEmail = await prisma.agentProfile.findUnique({ where: { email } });
+  if (byEmail) return byEmail;
+
+  return prisma.agentProfile.create({
+    data: {
+      email,
+      agentName: session.name || 'Land Sales Specialist',
+    },
   });
-
-  if (!agent) {
-    // If an agent record exists already (e.g. logged in via Google OAuth), use it
-    agent = await prisma.agentProfile.findFirst();
-  }
-
-  if (!agent) {
-    const defaultPasswordHash = await bcrypt.hash('admin123', 10);
-    agent = await prisma.agentProfile.create({
-      data: {
-        email: defaultEmail,
-        agentName: 'Land Sales Specialist',
-        passwordHash: defaultPasswordHash,
-        whatsappNumber: '+254700000000',
-        customGreeting: "Hi! I'm inquiring about [Plot Title]. Is it still available?",
-      },
-    });
-  }
-
-  return agent;
 }

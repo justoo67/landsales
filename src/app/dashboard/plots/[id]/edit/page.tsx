@@ -15,8 +15,8 @@ export default async function EditPlotPage({
   }
 
   const { id } = await params;
-  const plot = await prisma.plot.findUnique({
-    where: { id },
+  const plot = await prisma.plot.findFirst({
+    where: { id, deletedAt: null },
   });
 
   if (!plot) {
@@ -35,11 +35,13 @@ export default async function EditPlotPage({
     if (plot.customAttributes) {
       const parsed = JSON.parse(plot.customAttributes);
       if (Array.isArray(parsed)) {
-        parsedCustomAttributes = parsed.map((item: any, idx: number) => ({
-          id: item.id || `attr-${idx}-${Date.now()}`,
-          label: item.label || '',
-          value: item.value || '',
-        }));
+        parsedCustomAttributes = parsed.map(
+          (item: { id?: string; label?: string; value?: string }, idx: number) => ({
+            id: item.id || `attr-${idx}-${plot.id}`,
+            label: item.label || '',
+            value: item.value || '',
+          })
+        );
       }
     }
   } catch {

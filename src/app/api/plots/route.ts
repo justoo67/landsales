@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { plotJson } from '@/lib/serialize';
+import { requestMoney } from '@/lib/money.server';
 import { nanoid } from 'nanoid';
 
 export async function GET(req: Request) {
@@ -14,7 +16,7 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
     const query = searchParams.get('query');
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
 
     if (status && status !== 'ALL') {
       where.status = status.toUpperCase();
@@ -22,10 +24,10 @@ export async function GET(req: Request) {
 
     if (query) {
       where.OR = [
-        { title: { contains: query } },
-        { description: { contains: query } },
-        { sizeCustomValue: { contains: query } },
-        { zoning: { contains: query } },
+        { title: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+        { sizeCustomValue: { contains: query, mode: 'insensitive' } },
+        { zoning: { contains: query, mode: 'insensitive' } },
       ];
     }
 
@@ -34,7 +36,7 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ plots });
+    return NextResponse.json({ plots: plots.map(plotJson) });
   } catch (err) {
     console.error('Fetch plots error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -75,6 +77,13 @@ export async function POST(req: Request) {
       );
     }
 
+    let parsedPrice;
+    try {
+      parsedPrice = requestMoney(priceKes);
+    } catch {
+      return NextResponse.json({ error: 'Invalid price amount' }, { status: 400 });
+    }
+
     // Generate unguessable 10-character ID
     const id = nanoid(10);
 
@@ -84,7 +93,7 @@ export async function POST(req: Request) {
         title,
         status,
         priceType,
-        priceKes: priceKes ? parseFloat(priceKes) : null,
+        priceKes: parsedPrice,
         sizePreset,
         sizeCustomValue,
         zoning,
@@ -92,15 +101,15 @@ export async function POST(req: Request) {
         waterSource,
         electricity,
         description,
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
+        latitude: Number(latitude),
+        longitude: Number(longitude),
         photos: JSON.stringify(photos),
         videoUrl,
         customAttributes: customAttributes ? JSON.stringify(customAttributes) : null,
       },
     });
 
-    return NextResponse.json({ plot });
+    return NextResponse.json({ plot: plotJson(plot) });
   } catch (err) {
     console.error('Create plot error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

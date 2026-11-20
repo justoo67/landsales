@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  Sparkles,
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -68,13 +67,6 @@ function AuthForm() {
     setMode(newMode);
     setError(null);
     setSuccessMsg(null);
-  };
-
-  const handleFillDemo = () => {
-    triggerHaptic('light');
-    setLoginEmail('agent@example.com');
-    setLoginPassword('admin123');
-    setError(null);
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -356,16 +348,8 @@ function AuthForm() {
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            {/* Quick Demo Pre-fill Option */}
-            <div className="pt-2 flex items-center justify-between text-xs">
-              <button
-                type="button"
-                onClick={handleFillDemo}
-                className="inline-flex items-center gap-1.5 text-sky-600 hover:text-sky-700 font-medium touch-manipulation py-1.5 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Fill Demo Credentials</span>
-              </button>
+            {/* Account creation entry point */}
+            <div className="pt-2 flex items-center justify-end text-xs">
               <button
                 type="button"
                 onClick={() => switchMode('register')}

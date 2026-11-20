@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { saleRecordJson } from '@/lib/serialize';
 
 const VALID_STAGES = [
   'DEPOSIT_PAID',
@@ -47,7 +48,7 @@ export async function PATCH(
       data: { titleStatus },
     });
 
-    return NextResponse.json({ success: true, deal: updated });
+    return NextResponse.json({ success: true, deal: saleRecordJson(updated) });
   } catch (err) {
     console.error('Update milestone error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

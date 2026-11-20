@@ -22,6 +22,7 @@ import {
   Receipt,
   TrendingUp,
   Sparkles,
+  Users,
   X,
   ArrowRight,
 } from 'lucide-react';
@@ -90,6 +91,7 @@ export default function DashboardPage() {
     title: string;
   } | null>(null);
   const [isDeletingPlot, setIsDeletingPlot] = useState(false);
+  const [deleteNeedsConfirm, setDeleteNeedsConfirm] = useState(false);
 
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
 
@@ -192,6 +194,7 @@ export default function DashboardPage() {
   };
 
   const handleDeleteClick = (id: string, title: string) => {
+    setDeleteNeedsConfirm(false);
     setDeletePlotTarget({ id, title });
   };
 
@@ -199,7 +202,17 @@ export default function DashboardPage() {
     if (!deletePlotTarget) return;
     setIsDeletingPlot(true);
     try {
-      const res = await fetch(`/api/plots/${deletePlotTarget.id}`, { method: 'DELETE' });
+      const res = await fetch(
+        `/api/plots/${deletePlotTarget.id}${deleteNeedsConfirm ? '?confirm=true' : ''}`,
+        { method: 'DELETE' }
+      );
+
+      if (res.status === 409) {
+        // Plot has a sale record: ask again, and keep the ledger.
+        setDeleteNeedsConfirm(true);
+        return;
+      }
+
       if (res.ok) {
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate(20);
@@ -634,6 +647,16 @@ export default function DashboardPage() {
                         )}
                       </button>
 
+                      {/* Interested buyers for this plot */}
+                      <Link
+                        href={`/dashboard/leads?plot=${plot.id}`}
+                        className="w-11 h-11 flex items-center justify-center text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all touch-manipulation active:scale-95"
+                        title="Buyers interested in this plot"
+                        aria-label="Leads for this plot"
+                      >
+                        <Users className="w-4 h-4" />
+                      </Link>
+
                       {/* Edit Link */}
                       <Link
                         href={`/dashboard/plots/${plot.id}/edit`}
@@ -709,10 +732,23 @@ export default function DashboardPage() {
         <div className="w-full max-w-sm bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom-4 duration-200">
           <div className="text-center space-y-1.5 pt-1">
             <h3 className="text-base font-bold text-slate-900">
-              Delete Property Listing?
+              {deleteNeedsConfirm ? 'Hide Listing With Sale Record?' : 'Delete Property Listing?'}
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Are you sure you want to permanently delete <strong className="text-slate-700">&ldquo;{deletePlotTarget.title}&rdquo;</strong>? This action cannot be undone.
+              {deleteNeedsConfirm ? (
+                <>
+                  <strong className="text-slate-700">&ldquo;{deletePlotTarget.title}&rdquo;</strong>{' '}
+                  already has a buyer and payment history. Hiding it removes the listing and its
+                  public link, but <strong className="text-slate-700">keeps every payment and
+                  milestone</strong> in your records.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to remove{' '}
+                  <strong className="text-slate-700">&ldquo;{deletePlotTarget.title}&rdquo;</strong>{' '}
+                  from your portfolio? Its public link will stop working.
+                </>
+              )}
             </p>
           </div>
 
@@ -723,12 +759,19 @@ export default function DashboardPage() {
               onClick={confirmDelete}
               className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-semibold text-sm rounded-2xl shadow-md shadow-rose-600/20 transition-all min-h-[48px] touch-manipulation disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isDeletingPlot ? 'Deleting...' : 'Delete Listing'}
+              {isDeletingPlot
+                ? 'Removing...'
+                : deleteNeedsConfirm
+                ? 'Hide Listing, Keep Records'
+                : 'Delete Listing'}
             </button>
             <button
               type="button"
               disabled={isDeletingPlot}
-              onClick={() => setDeletePlotTarget(null)}
+              onClick={() => {
+                setDeletePlotTarget(null);
+                setDeleteNeedsConfirm(false);
+              }}
               className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-700 font-semibold text-sm rounded-2xl transition-all min-h-[48px] touch-manipulation"
             >
               Cancel

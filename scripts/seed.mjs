@@ -7,7 +7,14 @@ async function main() {
   console.log('Seeding database...');
 
   // Ensure default agent profile
-  const passwordHash = await bcrypt.hash('admin123', 10);
+  const seedPassword =
+    process.env.SEED_AGENT_PASSWORD ||
+    (() => {
+      const generated = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      console.log(`Generated agent password (set SEED_AGENT_PASSWORD to control it): ${generated}`);
+      return generated;
+    })();
+  const passwordHash = await bcrypt.hash(seedPassword, 10);
   await prisma.agentProfile.upsert({
     where: { email: 'agent@example.com' },
     update: {},

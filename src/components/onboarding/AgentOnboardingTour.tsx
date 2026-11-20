@@ -88,6 +88,13 @@ export default function AgentOnboardingTour({
 
   const step = TOUR_STEPS[currentStepIndex];
 
+  const handleDismiss = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('plotpilot_tour_completed', 'true');
+    }
+    onClose();
+  };
+
   const updatePosition = useCallback(() => {
     if (!step) return;
     const el = document.getElementById(step.targetId);
@@ -161,13 +168,6 @@ export default function AgentOnboardingTour({
   }, [isOpen, currentStepIndex]);
 
   if (!isOpen || !step) return null;
-
-  const handleDismiss = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('plotpilot_tour_completed', 'true');
-    }
-    onClose();
-  };
 
   const handleNext = () => {
     if (currentStepIndex < TOUR_STEPS.length - 1) {

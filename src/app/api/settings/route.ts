@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession, ensureDefaultAgent } from '@/lib/auth';
+import { getSession, ensureAgentForSession } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
 export async function GET() {
@@ -10,19 +10,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let agent = session.agentId
-      ? await prisma.agentProfile.findUnique({ where: { id: session.agentId } })
-      : null;
-
-    if (!agent && session.email) {
-      agent = await prisma.agentProfile.findUnique({
-        where: { email: session.email.toLowerCase() },
-      });
-    }
-
-    if (!agent) {
-      agent = await ensureDefaultAgent();
-    }
+    const agent = await ensureAgentForSession(session);
 
     return NextResponse.json({
       profile: {
@@ -51,18 +39,11 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const { agentName, whatsappNumber, customGreeting, currentPassword, newPassword } = body;
 
-    let agent = session.agentId
-      ? await prisma.agentProfile.findUnique({ where: { id: session.agentId } })
-      : null;
-
-    if (!agent && session.email) {
-      agent = await prisma.agentProfile.findUnique({
-        where: { email: session.email.toLowerCase() },
-      });
-    }
-
-    if (!agent) {
-      agent = await ensureDefaultAgent();
+    let agent;
+    try {
+      agent = await ensureAgentForSession(session);
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Optional password change

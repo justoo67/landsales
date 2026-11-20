@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { saleRecordJson } from '@/lib/serialize';
+import {
+  D,
+  requestMoney,
+  serializeMoney,
+  subtractFloorZero,
+} from '@/lib/money.server';
 
 export async function GET(
   req: Request,
@@ -32,7 +39,16 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ deal });
+    return NextResponse.json({
+      deal: deal
+        ? {
+            ...saleRecordJson(deal),
+            plot: deal.plot
+              ? { ...deal.plot, priceKes: serializeMoney(deal.plot.priceKes) }
+              : null,
+          }
+        : null,
+    });
   } catch (err) {
     console.error('Fetch deal error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -71,17 +87,41 @@ export async function POST(
       );
     }
 
-    const numericPrice = parseFloat(String(agreedPriceKes));
-    const numericDeposit = parseFloat(String(depositKes || 0));
-    const calculatedBalance = Math.max(0, numericPrice - numericDeposit);
+    let numericPrice;
+    let numericDeposit;
+    try {
+      numericPrice = requestMoney(agreedPriceKes);
+      numericDeposit = requestMoney(depositKes) ?? new D(0);
+    } catch {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
+    }
 
-    // 1. Update plot status
+    if (!numericPrice || numericPrice.lte(0)) {
+      return NextResponse.json(
+        { error: 'Agreed price must be greater than zero' },
+        { status: 400 }
+      );
+    }
+
+    const calculatedBalance = subtractFloorZero(numericPrice, numericDeposit);
+
+    // 1. Ensure the plot exists and is not deleted
+    const plot = await prisma.plot.findFirst({
+      where: { id: plotId, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!plot) {
+      return NextResponse.json({ error: 'Plot not found' }, { status: 404 });
+    }
+
+    // 2. Update plot status
     await prisma.plot.update({
       where: { id: plotId },
       data: { status: plotStatus },
     });
 
-    // 2. Check if deal already exists for this plot
+    // 3. Check if deal already exists for this plot
     const existingDeal = await prisma.saleRecord.findUnique({
       where: { plotId },
     });
@@ -128,18 +168,17 @@ export async function POST(
           nextDueDate: nextDueDate ? new Date(nextDueDate) : null,
           notes: notes || null,
           titleStatus: 'DEPOSIT_PAID',
-          installments:
-            numericDeposit > 0
-              ? {
-                  create: [
-                    {
-                      amountKes: numericDeposit,
-                      reference: 'Initial Deposit',
-                      notes: 'Initial booking / down payment',
-                    },
-                  ],
-                }
-              : undefined,
+          installments: numericDeposit.gt(0)
+            ? {
+                create: [
+                  {
+                    amountKes: numericDeposit,
+                    reference: 'Initial Deposit',
+                    notes: 'Initial booking / down payment',
+                  },
+                ],
+              }
+            : undefined,
         },
         include: {
           installments: { orderBy: { paymentDate: 'desc' } },
@@ -148,7 +187,7 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ success: true, deal });
+    return NextResponse.json({ success: true, deal: saleRecordJson(deal) });
   } catch (err) {
     console.error('Save deal error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

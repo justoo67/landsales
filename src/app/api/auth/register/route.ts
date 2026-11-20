@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createSession } from '@/lib/auth';
+import { createSession, isAllowedAgentEmail } from '@/lib/auth';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
   try {
+    const limit = rateLimit(`register:${clientIp(req)}`, 5, 60 * 60 * 1000);
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      );
+    }
+
     const body = await req.json();
     const { email, password, name, agentName, whatsappNumber } = body;
 
@@ -23,6 +32,25 @@ export async function POST(req: Request) {
         { error: 'Please enter a valid email address' },
         { status: 400 }
       );
+    }
+
+    // Single-agent deployment: only the configured address may register, and
+    // only one agent account may exist at a time.
+    if (!isAllowedAgentEmail(normalizedEmail)) {
+      return NextResponse.json({ error: 'Access restricted' }, { status: 403 });
+    }
+
+    const existingAgentCount = await prisma.agentProfile.count();
+    if (existingAgentCount > 0) {
+      const existingForEmail = await prisma.agentProfile.findUnique({
+        where: { email: normalizedEmail },
+      });
+      if (!existingForEmail) {
+        return NextResponse.json(
+          { error: 'This deployment already has an agent account.' },
+          { status: 409 }
+        );
+      }
     }
 
     // 2. Password validation

@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { saleRecordJson } from '@/lib/serialize';
+import {
+  serializeMoney,
+  subtractFloorZero,
+  sumDecimals,
+} from '@/lib/money.server';
 
 export async function GET() {
   try {
@@ -28,20 +34,24 @@ export async function GET() {
       orderBy: { closedAt: 'desc' },
     });
 
-    const totalSoldVolume = deals.reduce((sum, d) => sum + d.agreedPriceKes, 0);
-    const totalCollected = deals.reduce((sum, d) => {
-      const paid = d.installments.reduce((acc, inst) => acc + inst.amountKes, 0);
-      return sum + paid;
-    }, 0);
-    const totalOutstanding = Math.max(0, totalSoldVolume - totalCollected);
+    const totalSoldVolume = sumDecimals(deals.map((d) => d.agreedPriceKes));
+    const totalCollected = sumDecimals(
+      deals.flatMap((d) => d.installments.map((i) => i.amountKes))
+    );
+    const totalOutstanding = subtractFloorZero(totalSoldVolume, totalCollected);
 
     return NextResponse.json({
-      deals,
+      deals: deals.map((deal) => ({
+        ...saleRecordJson(deal),
+        plot: deal.plot
+          ? { ...deal.plot, priceKes: serializeMoney(deal.plot.priceKes) }
+          : null,
+      })),
       metrics: {
         totalDeals: deals.length,
-        totalSoldVolume,
-        totalCollected,
-        totalOutstanding,
+        totalSoldVolume: serializeMoney(totalSoldVolume) ?? 0,
+        totalCollected: serializeMoney(totalCollected) ?? 0,
+        totalOutstanding: serializeMoney(totalOutstanding) ?? 0,
       },
     });
   } catch (err) {
