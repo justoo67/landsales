@@ -67,6 +67,9 @@ export async function PATCH(
     if (body.sizePreset !== undefined) data.sizePreset = body.sizePreset;
     if (body.sizeCustomValue !== undefined)
       data.sizeCustomValue = body.sizeCustomValue;
+    if (body.county !== undefined) data.county = body.county || null;
+    if (body.ward !== undefined) data.ward = body.ward || null;
+    if (body.locationName !== undefined) data.locationName = body.locationName || null;
     if (body.zoning !== undefined) data.zoning = body.zoning;
     if (body.roadAccess !== undefined) data.roadAccess = body.roadAccess;
     if (body.waterSource !== undefined) data.waterSource = body.waterSource;

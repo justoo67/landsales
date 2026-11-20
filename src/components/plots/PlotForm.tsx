@@ -46,6 +46,9 @@ export interface PlotFormData {
   priceKes: string;
   sizePreset: string;
   sizeCustomValue: string;
+  county?: string | null;
+  ward?: string | null;
+  locationName?: string | null;
   zoning?: string | null;
   roadAccess?: string | null;
   waterSource?: string | null;
@@ -103,6 +106,9 @@ export default function PlotForm({ initialData, isEditing = false }: PlotFormPro
     priceKes: initialData?.priceKes || '',
     sizePreset: initialData?.sizePreset || '50x100',
     sizeCustomValue: initialData?.sizeCustomValue || '',
+    county: initialData?.county || '',
+    ward: initialData?.ward || '',
+    locationName: initialData?.locationName || '',
     zoning: initialData?.zoning !== undefined ? initialData.zoning : 'Residential',
     roadAccess: initialData?.roadAccess !== undefined ? initialData.roadAccess : 'All-weather gravel',
     waterSource: initialData?.waterSource !== undefined ? initialData.waterSource : 'Borehole on-site',
@@ -637,6 +643,49 @@ export default function PlotForm({ initialData, isEditing = false }: PlotFormPro
                 <span className="text-[11px] text-slate-500">
                   Select &ldquo;Remove&rdquo; to exclude a field from the listing
                 </span>
+              </div>
+
+              {/* Location context, used for comparable sales */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <div>
+                  <label htmlFor="plot-county" className="text-xs font-semibold text-slate-700 block mb-1.5">
+                    County
+                  </label>
+                  <input
+                    id="plot-county"
+                    value={formData.county || ''}
+                    onChange={(e) => setFormData({ ...formData, county: e.target.value })}
+                    placeholder="e.g. Kajiado"
+                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none text-slate-900 min-h-[44px] text-base"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="plot-ward" className="text-xs font-semibold text-slate-700 block mb-1.5">
+                    Ward
+                  </label>
+                  <input
+                    id="plot-ward"
+                    value={formData.ward || ''}
+                    onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
+                    placeholder="e.g. Ngong"
+                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none text-slate-900 min-h-[44px] text-base"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="plot-location" className="text-xs font-semibold text-slate-700 block mb-1.5">
+                    Location name
+                  </label>
+                  <input
+                    id="plot-location"
+                    value={formData.locationName || ''}
+                    onChange={(e) => setFormData({ ...formData, locationName: e.target.value })}
+                    placeholder="e.g. Ngong Ridge"
+                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none text-slate-900 min-h-[44px] text-base"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 sm:col-span-3 leading-relaxed">
+                  Used to match comparable sales and suggest a price. Leave blank if unknown.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

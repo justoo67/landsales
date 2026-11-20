@@ -12,7 +12,7 @@ import { parseKes } from './money';
 
 export const D = Prisma.Decimal;
 
-type MoneyInput = Prisma.Decimal | number | string | null | undefined;
+export type MoneyInput = Prisma.Decimal | number | string | null | undefined;
 
 /** Convert anything money-shaped into a Decimal, or null when absent. */
 export function toDecimal(value: MoneyInput): Prisma.Decimal | null {

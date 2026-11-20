@@ -16,6 +16,9 @@ model Plot {
   priceKes         Decimal?    @db.Decimal(14, 2)
   sizePreset       String // "50x100", "40x80", "100x100", "ACRES", "HECTARES", "SQM", "CUSTOM"
   sizeCustomValue  String? // e.g. "0.5", "2.5", "100x150 ft"
+  county           String?
+  ward             String?
+  locationName     String?
   zoning           String? // Residential, Agricultural, Commercial, Mixed
   roadAccess       String? // Tarmac, All-weather gravel, Dirt road, None
   waterSource      String? // Borehole, Piped county water, Natural stream, None
@@ -231,4 +234,27 @@ model Document {
   @@index([plotId, createdAt])
   @@index([saleId, createdAt])
   @@index([contactId, createdAt])
+}
+
+model Comparable {
+  id           String   @id @default(cuid())
+  county       String
+  ward         String?
+  locationName String
+  latitude     Float?
+  longitude    Float?
+  sizeAcres    Decimal  @db.Decimal(10, 4)
+  priceKes     Decimal  @db.Decimal(14, 2)
+  pricePerAcre Decimal  @db.Decimal(14, 2) // computed on write
+  kind         String   @default("SALE") // SALE|LISTING
+  source       String   @default("AGENT") // AGENT|PORTAL|PUBLIC_RECORD|HEARD
+  sourceUrl    String?
+  observedAt   DateTime @default(now())
+  verified     Boolean  @default(false)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([county, ward, observedAt])
+  @@index([observedAt])
 }

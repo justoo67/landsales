@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, Settings, Layers, Users, CalendarCheck } from 'lucide-react';
+import { Plus, Settings, Layers, Users, CalendarCheck, Landmark } from 'lucide-react';
 
 interface AgentNavbarProps {
   agentName?: string;
@@ -31,6 +31,7 @@ export default function AgentNavbar({
   const isDashboard = pathname === '/dashboard';
   const isLeads = pathname.startsWith('/dashboard/leads');
   const isToday = pathname.startsWith('/dashboard/today');
+  const isComps = pathname.startsWith('/dashboard/comps');
   const isSettings = pathname === '/dashboard/settings';
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function AgentNavbar({
         </Link>
 
         {/* Primary sections */}
-        <nav className="flex items-center gap-1 bg-slate-100/80 rounded-xl p-1" aria-label="Sections">
+        <nav className="flex items-center gap-1 bg-slate-100/80 rounded-xl p-1 overflow-x-auto max-w-[60vw] sm:max-w-none" aria-label="Sections">
           <Link
             href="/dashboard"
             aria-current={isDashboard ? 'page' : undefined}
@@ -103,6 +104,16 @@ export default function AgentNavbar({
                 {dueCount > 9 ? '9+' : dueCount}
               </span>
             )}
+          </Link>
+          <Link
+            href="/dashboard/comps"
+            aria-current={isComps ? 'page' : undefined}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors min-h-[36px] touch-manipulation flex-shrink-0 ${
+              isComps ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Landmark className="w-3.5 h-3.5" />
+            Comps
           </Link>
         </nav>
 

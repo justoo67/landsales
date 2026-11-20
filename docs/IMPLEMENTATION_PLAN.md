@@ -79,8 +79,8 @@ SMS gateway, AI pricing, full offline sync, buyer invoicing, document e-signatur
 | 1 | Contacts, leads, inquiry capture, pipeline | 3–5 d | **done** |
 | 2 | Tasks, today view, follow-up logging | 2–4 d | **done** |
 | 3 | Site visits, documents | 2–3 d | **done** |
-| 4 | Comparables & price guidance | 3–4 d | next |
-| 5 | Payments, commission, statements | 4–6 d | planned |
+| 4 | Comparables & price guidance | 3–4 d | **done** |
+| 5 | Payments, commission, statements | 4–6 d | next |
 | 6 | Test coverage, CI, export, launch polish | 2–3 d | planned |
 
 Roughly 17–27 focused days. Phase 1 is the highest-value increment: it turns the app from a
@@ -387,15 +387,34 @@ model Comparable {
 }
 ```
 
-- [ ] Fast-entry form (location, acres, price, kind, source, date) — price/acre computed on write.
-- [ ] `src/lib/pricing.ts`: median price/acre over same county+ward and a ±40% size band;
+- [x] Fast-entry form (location, acres, price, kind, source, date) — price/acre computed on write.
+- [x] `src/lib/pricing.ts`: median price/acre over same county+ward and a ±40% size band;
       returns `{ low, mid, high, compsUsed[] }`. Deterministic and explainable — the UI always
       shows which comps produced the number.
-- [ ] Plot detail "Price guidance" card; flags an asking price >25% off the comp median.
-- [ ] Printable offer sheet (print CSS; no PDF service).
-- [ ] `Acres` normalisation for `sq m` / `ha` / ft-dimension presets.
+- [x] Plot detail "Price guidance" card; flags an asking price >25% off the comp median.
+- [x] Printable offer sheet (print CSS; no PDF service).
+- [x] `Acres` normalisation for `sq m` / `ha` / ft-dimension presets.
 
 **Exit:** adding a comps set produces a suggested range and the comps used are visible.
+
+### 8.1 Phase 4 implementation notes
+
+- `Plot` gained `county`, `ward`, and `locationName` (migration 0007): comps cannot be matched
+  without them, so the plot form now captures them.
+- Guidance matches on county + ward and **widens to the county** when the ward has fewer than
+  two usable comps; the response reports `scope` so the UI can say which was used.
+- The range is P25 / median / P75 of price-per-acre among comps within ±40% of the subject's
+  size — resistant to a single outlier and always attributable.
+- `src/lib/units.ts` converts `50x100`, `40x80`, `100x100`, acres, hectares, sq m, and freeform
+  `100x150 ft` / `0.4 ha` / `800 sqm` values into acres (tested).
+- The offer sheet is a server-rendered print page at `/dashboard/plots/:id/offer`, linked from the
+  plot edit header; it uses print CSS, so "Save as PDF" is the browser's job.
+- Nav now carries Plots · Leads · Today · Comps; on small screens the segmented control scrolls
+  horizontally rather than wrapping.
+- Files: `src/lib/{units,pricing,comps}.ts`, `src/app/api/comps/**`,
+  `src/app/api/plots/[id]/guidance/route.ts`, `src/components/comps/*`,
+  `src/components/pricing/*`, `src/app/dashboard/comps/page.tsx`,
+  `src/app/dashboard/plots/[id]/offer/page.tsx`.
 
 ---
 
@@ -520,3 +539,4 @@ agent-facing safety net.
 | 2026-11-20 | Phase 1 complete: Contacts/Leads/Activity, public inquiry capture with optional buyer details, lead board + detail timeline, stage rules, phone normalisation, sale backfill. |
 | 2026-11-20 | Phase 2 complete: Task model + migration 0005, Today view with overdue/today/upcoming, one-tap complete and snooze, next-action stage rule, nav badge. |
 | 2026-11-20 | Phase 3 complete: SiteVisit + Document models + migration 0006, visit scheduling with paired reminder tasks, day view, inline outcomes, plot document uploader, public-page leak check. |
+| 2026-11-20 | Phase 4 complete: Comparable model + plot location fields (migration 0007), acres normalisation, ward→county median price guidance with size band, guidance card, printable offer sheet. |
