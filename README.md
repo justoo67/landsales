@@ -86,3 +86,8 @@ ledger and buyer review survive.
 
 See [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) for the phased plan
 (leads, tasks, site visits, comparables, commission).
+
+## Deployment
+
+Production runs on Vercel from `master`. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+for the project IDs, environment variables, migration procedure, and rollback steps.
