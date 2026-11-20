@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarDays, CheckCircle2, Loader2, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { CalendarDays, CheckCircle2, ChevronRight, Loader2, Plus } from 'lucide-react';
 import TaskRow, { type TaskItem } from './TaskRow';
 import LeadDetailSheet from '@/components/leads/LeadDetailSheet';
 import { triggerHaptic } from '@/lib/haptics';
@@ -184,6 +185,21 @@ export default function TodayClient() {
             : 'Your follow-ups for the day'}
         </p>
       </div>
+
+      {/* Visits shortcut */}
+      <Link
+        href="/dashboard/visits"
+        className="mb-4 flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-3.5 py-3 shadow-sm hover:border-slate-300 transition-colors touch-manipulation"
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <CalendarDays className="w-4 h-4 text-violet-500" />
+          Site visits
+        </span>
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+          Day view
+          <ChevronRight className="w-4 h-4" />
+        </span>
+      </Link>
 
       {/* Quick add */}
       <form

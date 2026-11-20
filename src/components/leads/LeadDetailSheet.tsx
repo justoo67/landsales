@@ -28,6 +28,7 @@ import {
   STAGE_STYLES,
   type LeadStage,
 } from '@/lib/lead-stages';
+import LeadVisits from '@/components/visits/LeadVisits';
 import type { LeadActivity, LeadRecord } from '@/lib/lead-types';
 
 interface LeadDetailSheetProps {
@@ -537,6 +538,13 @@ export default function LeadDetailSheet({
                   </p>
                 )}
               </section>
+
+              <LeadVisits
+                leadId={leadId}
+                stage={lead.stage}
+                onOffer={() => changeStage('OFFER')}
+                onChanged={onChanged}
+              />
 
               {/* Buyer details */}
               <section className="space-y-2">

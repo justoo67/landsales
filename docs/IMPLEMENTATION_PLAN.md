@@ -78,8 +78,8 @@ SMS gateway, AI pricing, full offline sync, buyer invoicing, document e-signatur
 | 0 | Foundations: migrations, money, soft delete, auth, tests | 1–2 d | **done** |
 | 1 | Contacts, leads, inquiry capture, pipeline | 3–5 d | **done** |
 | 2 | Tasks, today view, follow-up logging | 2–4 d | **done** |
-| 3 | Site visits, documents | 2–3 d | next |
-| 4 | Comparables & price guidance | 3–4 d | planned |
+| 3 | Site visits, documents | 2–3 d | **done** |
+| 4 | Comparables & price guidance | 3–4 d | next |
 | 5 | Payments, commission, statements | 4–6 d | planned |
 | 6 | Test coverage, CI, export, launch polish | 2–3 d | planned |
 
@@ -338,12 +338,29 @@ model Document {
 }
 ```
 
-- [ ] Schedule/complete a visit from a lead; day view at `/dashboard/visits`.
-- [ ] Completed visit with rating offers "move lead to OFFER".
-- [ ] Document upload reuses the existing presigned R2 path; attached to plot/sale/contact.
-- [ ] Documents are **never** exposed on `/p/[id]`.
+- [x] Schedule/complete a visit from a lead; day view at `/dashboard/visits`.
+- [x] Completed visit with rating offers "move lead to OFFER".
+- [x] Document upload reuses the existing presigned R2 path; attached to plot/sale/contact.
+- [x] Documents are **never** exposed on `/p/[id]`.
 
 **Exit:** a visit is scheduled, completed, and reflected in the lead timeline.
+
+### 7.1 Phase 3 implementation notes
+
+- A visit always creates its own reminder `Task` and stores `taskId` on the visit, so completing
+  or cancelling the visit closes the reminder explicitly instead of guessing by date.
+- The day view at `/dashboard/visits` navigates day by day and hosts complete / no-show / cancel;
+  the lead sheet hosts scheduling and inline outcome capture (rating + feedback).
+- After a completed visit, the lead sheet offers a one-tap "move to Offer" — which still goes
+  through the Phase 2 next-action rule.
+- Documents are attached to a plot (UI), a sale, or a contact (API). The plot edit page hosts the
+  uploader. Files go through `/api/upload` (R2 when configured, local `public/uploads` otherwise)
+  and are capped at 25 MB. Deleting a document removes the record; the R2 object is left for
+  lifecycle rules.
+- Public listing pages never query `Document` — verified by grepping the rendered HTML.
+- Files: `src/lib/{visits,document-types}.ts`, `src/app/api/visits/**`,
+  `src/app/api/documents/**`, `src/components/visits/*`, `src/components/documents/*`,
+  `src/app/dashboard/visits/page.tsx`.
 
 ---
 
@@ -502,3 +519,4 @@ agent-facing safety net.
 | 2026-11-20 | Phase 0 complete: Decimal money, soft delete + RESTRICT FK, versioned migrations, auth fail-closed, rate limiting, proxy guard, Vitest, lint at zero errors. |
 | 2026-11-20 | Phase 1 complete: Contacts/Leads/Activity, public inquiry capture with optional buyer details, lead board + detail timeline, stage rules, phone normalisation, sale backfill. |
 | 2026-11-20 | Phase 2 complete: Task model + migration 0005, Today view with overdue/today/upcoming, one-tap complete and snooze, next-action stage rule, nav badge. |
+| 2026-11-20 | Phase 3 complete: SiteVisit + Document models + migration 0006, visit scheduling with paired reminder tasks, day view, inline outcomes, plot document uploader, public-page leak check. |

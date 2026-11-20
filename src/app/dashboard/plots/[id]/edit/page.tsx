@@ -1,5 +1,6 @@
 import AgentNavbar from '@/components/layout/AgentNavbar';
 import PlotForm from '@/components/plots/PlotForm';
+import DocumentsSection from '@/components/documents/DocumentsSection';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
@@ -83,6 +84,10 @@ export default async function EditPlotPage({
         </div>
 
         <PlotForm initialData={initialData} isEditing={true} />
+
+        <div className="mt-6">
+          <DocumentsSection plotId={plot.id} title="Plot documents" />
+        </div>
       </main>
     </div>
   );
