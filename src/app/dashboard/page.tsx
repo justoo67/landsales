@@ -85,6 +85,18 @@ export default function DashboardPage() {
     totalOutstanding: number;
   } | null>(null);
 
+  const [finance, setFinance] = useState<{
+    receivables: {
+      current: number;
+      d0_30: number;
+      d31_60: number;
+      d60plus: number;
+      undated: number;
+      total: number;
+    };
+    commission: { expected: number; unpaid: number; paid: number; count: number };
+  } | null>(null);
+
   // Destructive Action Sheet State (Apple HIG action-sheets.md)
   const [deletePlotTarget, setDeletePlotTarget] = useState<{
     id: string;
@@ -140,6 +152,7 @@ export default function DashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setDealsMetrics(data.metrics || null);
+        setFinance(data.finance || null);
       }
     } catch (err) {
       console.error('Fetch deals metrics error:', err);
@@ -373,6 +386,55 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
+
+            {finance && (
+              <div className="mt-4 pt-3 border-t border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Receivables aging
+                  </span>
+                  <Link
+                    href="/dashboard/money"
+                    className="text-[11px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-0.5"
+                  >
+                    Money <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5 text-center">
+                  {([
+                    ['Not due', finance.receivables.current, 'text-slate-300'],
+                    ['0–30d', finance.receivables.d0_30, 'text-amber-300'],
+                    ['31–60d', finance.receivables.d31_60, 'text-orange-300'],
+                    ['60d+', finance.receivables.d60plus, 'text-rose-300'],
+                  ] as const).map(([label, value, tone]) => (
+                    <div key={label} className="bg-white/5 rounded-lg py-2">
+                      <span className="text-[10px] font-semibold text-slate-400 block">
+                        {label}
+                      </span>
+                      <span className={`text-[11px] font-bold ${tone} block mt-0.5`}>
+                        {value > 0 ? `KSh ${value.toLocaleString('en-KE')}` : '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">
+                    Commission unpaid:{' '}
+                    <strong className="text-white">
+                      KSh {finance.commission.unpaid.toLocaleString('en-KE')}
+                    </strong>
+                  </span>
+                  <span className="text-slate-400">
+                    Paid:{' '}
+                    <strong className="text-emerald-300">
+                      KSh {finance.commission.paid.toLocaleString('en-KE')}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            )}
           </section>
         )}
 

@@ -14,13 +14,29 @@ import {
   Calendar,
   AlertCircle,
   ArrowRight,
+  Percent,
+  Wallet,
 } from 'lucide-react';
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@/lib/finance-types';
 
 interface Installment {
   id: string;
   amountKes: number;
   paymentDate: string;
+  method: string;
   reference: string | null;
+  receiptUrl: string | null;
+  notes: string | null;
+}
+
+interface CommissionData {
+  id: string;
+  basis: string;
+  ratePercent: number | null;
+  amountKes: number;
+  status: string;
+  dueDate: string | null;
+  paidAt: string | null;
   notes: string | null;
 }
 
@@ -49,6 +65,7 @@ interface DealData {
   closedAt: string;
   installments: Installment[];
   review: Review | null;
+  commission?: CommissionData | null;
 }
 
 interface DealLedgerModalProps {
@@ -76,13 +93,22 @@ export default function DealLedgerModal({
 }: DealLedgerModalProps) {
   const [deal, setDeal] = useState<DealData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'PAYMENTS' | 'MILESTONES' | 'REVIEW'>('PAYMENTS');
+  const [activeTab, setActiveTab] = useState<'PAYMENTS' | 'MILESTONES' | 'REVIEW' | 'COMMISSION'>('PAYMENTS');
 
   // Log Payment Form state
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
+  const [payMethod, setPayMethod] = useState('MPESA');
+  const [payReceipt, setPayReceipt] = useState<File | null>(null);
+
+  // Commission tab state
+  const [comBasis, setComBasis] = useState<'PERCENT' | 'FIXED'>('PERCENT');
+  const [comRate, setComRate] = useState('5');
+  const [comAmount, setComAmount] = useState('');
+  const [comStatus, setComStatus] = useState('PENDING');
+  const [savingCommission, setSavingCommission] = useState(false);
   const [loggingPayment, setLoggingPayment] = useState(false);
 
   // Review Form state
@@ -100,6 +126,16 @@ export default function DealLedgerModal({
         if (data.deal?.review?.comment) {
           setReviewComment(data.deal.review.comment);
           setReviewRating(data.deal.review.rating || 5);
+        }
+        if (data.deal?.commission) {
+          setComBasis(data.deal.commission.basis === 'FIXED' ? 'FIXED' : 'PERCENT');
+          setComRate(
+            data.deal.commission.ratePercent != null
+              ? String(data.deal.commission.ratePercent)
+              : ''
+          );
+          setComAmount(String(data.deal.commission.amountKes));
+          setComStatus(data.deal.commission.status);
         }
       }
     } catch (err) {
@@ -157,11 +193,25 @@ Thank you for your commitment!`;
 
     setLoggingPayment(true);
     try {
+      let receiptUrl: string | null = null;
+
+      if (payReceipt) {
+        const formData = new FormData();
+        formData.append('file', payReceipt);
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (uploadRes.ok) {
+          const uploaded = await uploadRes.json();
+          receiptUrl = uploaded.url || null;
+        }
+      }
+
       const res = await fetch(`/api/plots/${plotId}/deal/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amountKes: parseFloat(payAmount),
+          method: payMethod,
+          receiptUrl,
           reference: payRef.trim() || null,
           notes: payNotes.trim() || null,
         }),
@@ -171,6 +221,7 @@ Thank you for your commitment!`;
         setPayAmount('');
         setPayRef('');
         setPayNotes('');
+        setPayReceipt(null);
         setShowPaymentForm(false);
         await fetchDeal();
         onDealUpdated?.();
@@ -179,6 +230,31 @@ Thank you for your commitment!`;
       console.error('Log payment error:', err);
     } finally {
       setLoggingPayment(false);
+    }
+  };
+
+  const handleSaveCommission = async () => {
+    setSavingCommission(true);
+    try {
+      const res = await fetch(`/api/plots/${plotId}/deal/commission`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          basis: comBasis,
+          ratePercent: comBasis === 'PERCENT' ? comRate : null,
+          amountKes: comBasis === 'FIXED' ? comAmount : null,
+          status: comStatus,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDeal((prev) => (prev ? { ...prev, commission: data.commission } : prev));
+        onDealUpdated?.();
+      }
+    } catch (err) {
+      console.error('Save commission error:', err);
+    } finally {
+      setSavingCommission(false);
     }
   };
 
@@ -392,7 +468,7 @@ Thank you for your commitment!`;
             </div>
 
             {/* Navigation Tabs (Payments, Title Milestones, Review) */}
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
               <button
                 onClick={() => setActiveTab('PAYMENTS')}
                 className={`px-3 py-2 text-xs font-bold rounded-xl transition-all touch-manipulation min-h-[40px] ${
@@ -424,6 +500,17 @@ Thank you for your commitment!`;
                 }`}
               >
                 Buyer Review
+              </button>
+
+              <button
+                onClick={() => setActiveTab('COMMISSION')}
+                className={`px-3 py-2 text-xs font-bold rounded-xl transition-all touch-manipulation min-h-[40px] flex-shrink-0 ${
+                  activeTab === 'COMMISSION'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Commission
               </button>
             </div>
 
@@ -483,6 +570,37 @@ Thank you for your commitment!`;
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Payment method
+                        </label>
+                        <select
+                          value={payMethod}
+                          onChange={(e) => setPayMethod(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 min-h-[44px]"
+                        >
+                          {PAYMENT_METHODS.map((method) => (
+                            <option key={method} value={method}>
+                              {PAYMENT_METHOD_LABELS[method]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Receipt (optional)
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => setPayReceipt(e.target.files?.[0] ?? null)}
+                          className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 text-xs min-h-[44px]"
+                        />
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Notes (Optional)
@@ -530,10 +648,25 @@ Thank you for your commitment!`;
                                 year: 'numeric',
                               })}
                             </span>
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-semibold">
+                              {PAYMENT_METHOD_LABELS[
+                                (item.method || 'MPESA') as keyof typeof PAYMENT_METHOD_LABELS
+                              ] || item.method}
+                            </span>
                             {item.reference && (
                               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
                                 {item.reference}
                               </span>
+                            )}
+                            {item.receiptUrl && (
+                              <a
+                                href={item.receiptUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sky-600 font-semibold underline"
+                              >
+                                Receipt
+                              </a>
                             )}
                           </div>
                           {item.notes && (
@@ -547,6 +680,117 @@ Thank you for your commitment!`;
                         </div>
                       </div>
                     ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: COMMISSION */}
+            {activeTab === 'COMMISSION' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Percent className="w-3.5 h-3.5" />
+                    Your commission
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Track what you earned on this sale, separate from what the buyer owes.
+                  </p>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setComBasis('PERCENT')}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold min-h-[40px] ${
+                        comBasis === 'PERCENT'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      Percentage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setComBasis('FIXED')}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold min-h-[40px] ${
+                        comBasis === 'FIXED'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      Fixed amount
+                    </button>
+                  </div>
+
+                  {comBasis === 'PERCENT' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Rate (% of agreed price)
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        value={comRate}
+                        onChange={(e) => setComRate(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 min-h-[44px]"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        ≈ KSh{' '}
+                        {Math.round(
+                          (deal.agreedPriceKes * (parseFloat(comRate) || 0)) / 100
+                        ).toLocaleString('en-KE')}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Amount (KSh)
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={comAmount}
+                        onChange={(e) => setComAmount(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 min-h-[44px]"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={comStatus}
+                      onChange={(e) => setComStatus(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 min-h-[44px]"
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="INVOICED">Invoiced</option>
+                      <option value="PARTIAL">Part paid</option>
+                      <option value="PAID">Paid</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveCommission}
+                    disabled={savingCommission}
+                    className="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-xl min-h-[44px] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <Wallet className="w-3.5 h-3.5" />
+                    {savingCommission ? 'Saving…' : 'Save commission'}
+                  </button>
+
+                  {deal.commission && (
+                    <p className="text-[11px] text-slate-500 text-center">
+                      Current: KSh{' '}
+                      {deal.commission.amountKes.toLocaleString('en-KE')} ·{' '}
+                      {deal.commission.status.toLowerCase()}
+                    </p>
                   )}
                 </div>
               </div>

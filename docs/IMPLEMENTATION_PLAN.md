@@ -80,8 +80,8 @@ SMS gateway, AI pricing, full offline sync, buyer invoicing, document e-signatur
 | 2 | Tasks, today view, follow-up logging | 2–4 d | **done** |
 | 3 | Site visits, documents | 2–3 d | **done** |
 | 4 | Comparables & price guidance | 3–4 d | **done** |
-| 5 | Payments, commission, statements | 4–6 d | next |
-| 6 | Test coverage, CI, export, launch polish | 2–3 d | planned |
+| 5 | Payments, commission, statements | 4–6 d | **done** |
+| 6 | Test coverage, CI, export, launch polish | 2–3 d | next |
 
 Roughly 17–27 focused days. Phase 1 is the highest-value increment: it turns the app from a
 catalogue into a working day.
@@ -433,15 +433,34 @@ model Commission {
 }
 ```
 
-- [ ] `PaymentInstallment` → add `method` (MPESA/BANK/CASH/CHEQUE), `receiptUrl`.
-- [ ] `SaleRecord.buyerContactId`, `leadId`, `commission`.
-- [ ] Payment entry updates `balanceKes`, `nextDueDate`, `titleStatus` where appropriate.
-- [ ] Statement of account per sale, printable.
-- [ ] Commission derived from agreed price (percent or fixed), editable, status transitions.
-- [ ] Dashboard finance block extends `dealsMetrics` with receivables aging (0–30 / 31–60 / 60+).
-- [ ] WhatsApp overdue-payment reminder template (deep link).
+- [x] `PaymentInstallment` → add `method` (MPESA/BANK/CASH/CHEQUE), `receiptUrl`.
+- [x] `SaleRecord.leadId` (from Phase 1) and `commission`; `buyerContactId` deferred.
+- [x] Payment entry updates `balanceKes`, `nextDueDate`, `titleStatus` where appropriate.
+- [x] Statement of account per sale, printable.
+- [x] Commission derived from agreed price (percent or fixed), editable, status transitions.
+- [x] Dashboard finance block extends `dealsMetrics` with receivables aging (0–30 / 31–60 / 60+).
+- [x] WhatsApp overdue-payment reminder template (deep link).
 
 **Exit:** deposit → balance → commission → statement is correct end to end.
+
+### 9.1 Phase 5 implementation notes
+
+- Commission is one row per sale (`saleId` unique). The server always derives a percentage
+  commission from the agreed price — the client preview is a hint, not the source of truth.
+  Statuses: pending → invoiced → part paid → paid, with `paidAt` set on transition to paid.
+- Commission is deliberately **excluded from the buyer-facing statement**: the statement is
+  shareable, the commission is the agent's private margin.
+- Aging uses the stored `balanceKes` and `nextDueDate` (kept current by the payments route), so
+  the dashboard and a statement never disagree. Balances with no due date land in their own
+  bucket rather than being silently counted as current.
+- The statement at `/dashboard/plots/:id/statement` lists every payment with its method and
+  reference, then agreed price / received / balance.
+- `/dashboard/money` lists outstanding balances with a WhatsApp reminder deep link and a
+  statement link, plus every commission with its status.
+- `SaleRecord.buyerContactId` was deferred: the sale keeps denormalised buyer details, and
+  linking to `Contact` is safe to add once the buyer record is guaranteed to exist.
+- Files: `src/lib/{finance,finance-types}.ts`, `src/app/api/plots/[id]/deal/commission/route.ts`,
+  `src/components/money/*`, `src/app/dashboard/{money,plots/[id]/statement}/page.tsx`.
 
 ---
 
@@ -540,3 +559,4 @@ agent-facing safety net.
 | 2026-11-20 | Phase 2 complete: Task model + migration 0005, Today view with overdue/today/upcoming, one-tap complete and snooze, next-action stage rule, nav badge. |
 | 2026-11-20 | Phase 3 complete: SiteVisit + Document models + migration 0006, visit scheduling with paired reminder tasks, day view, inline outcomes, plot document uploader, public-page leak check. |
 | 2026-11-20 | Phase 4 complete: Comparable model + plot location fields (migration 0007), acres normalisation, ward→county median price guidance with size band, guidance card, printable offer sheet. |
+| 2026-11-20 | Phase 5 complete: payment methods + receipts, commission model (migration 0008), receivables aging, money view with WhatsApp reminders, printable statement of account. |

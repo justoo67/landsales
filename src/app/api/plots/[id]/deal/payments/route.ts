@@ -8,6 +8,7 @@ import {
   subtractFloorZero,
   sumDecimals,
 } from '@/lib/money.server';
+import { isPaymentMethod } from '@/lib/finance-types';
 
 export async function POST(
   req: Request,
@@ -21,7 +22,17 @@ export async function POST(
 
     const { id: plotId } = await params;
     const body = await req.json();
-    const { amountKes, paymentDate, reference, notes, nextDueDate } = body;
+    const {
+      amountKes,
+      paymentDate,
+      reference,
+      notes,
+      nextDueDate,
+      method,
+      receiptUrl,
+    } = body;
+
+    const paymentMethod = isPaymentMethod(method) ? method : 'MPESA';
 
     let amount;
     try {
@@ -55,7 +66,9 @@ export async function POST(
         saleRecordId: deal.id,
         amountKes: amount,
         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+        method: paymentMethod,
         reference: reference || null,
+        receiptUrl: receiptUrl || null,
         notes: notes || null,
       },
     });

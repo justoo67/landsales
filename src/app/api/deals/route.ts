@@ -7,6 +7,7 @@ import {
   subtractFloorZero,
   sumDecimals,
 } from '@/lib/money.server';
+import { commissionTotals, receivablesAging } from '@/lib/finance';
 
 export async function GET() {
   try {
@@ -30,6 +31,7 @@ export async function GET() {
           orderBy: { paymentDate: 'desc' },
         },
         review: true,
+        commission: true,
       },
       orderBy: { closedAt: 'desc' },
     });
@@ -52,6 +54,12 @@ export async function GET() {
         totalSoldVolume: serializeMoney(totalSoldVolume) ?? 0,
         totalCollected: serializeMoney(totalCollected) ?? 0,
         totalOutstanding: serializeMoney(totalOutstanding) ?? 0,
+      },
+      finance: {
+        receivables: receivablesAging(deals),
+        commission: commissionTotals(
+          deals.map((deal) => deal.commission).filter((item): item is NonNullable<typeof item> => Boolean(item))
+        ),
       },
     });
   } catch (err) {

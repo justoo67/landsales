@@ -27,6 +27,7 @@ export async function GET(
           orderBy: { paymentDate: 'desc' },
         },
         review: true,
+        commission: true,
         plot: {
           select: {
             id: true,

@@ -1,10 +1,12 @@
 import type {
   BuyerReview,
+  Commission,
   PaymentInstallment,
   Plot,
   SaleRecord,
 } from '@prisma/client';
 import { serializeMoney } from './money.server';
+import { commissionJson } from './finance';
 
 /**
  * JSON projections for Prisma money columns.
@@ -24,10 +26,11 @@ export function installmentJson(installment: PaymentInstallment) {
 export type SaleRecordWithRelations = SaleRecord & {
   installments?: PaymentInstallment[];
   review?: BuyerReview | null;
+  commission?: Commission | null;
 };
 
 export function saleRecordJson(deal: SaleRecordWithRelations) {
-  const { installments, review, ...rest } = deal;
+  const { installments, review, commission, ...rest } = deal;
 
   return {
     ...rest,
@@ -36,6 +39,7 @@ export function saleRecordJson(deal: SaleRecordWithRelations) {
     balanceKes: serializeMoney(rest.balanceKes) ?? 0,
     ...(installments ? { installments: installments.map(installmentJson) } : {}),
     ...(review !== undefined ? { review } : {}),
+    ...(commission !== undefined ? { commission: commissionJson(commission) } : {}),
   };
 }
 

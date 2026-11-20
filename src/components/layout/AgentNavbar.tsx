@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, Settings, Layers, Users, CalendarCheck, Landmark } from 'lucide-react';
+import { Plus, Settings, Layers, Users, CalendarCheck, Landmark, Wallet } from 'lucide-react';
 
 interface AgentNavbarProps {
   agentName?: string;
@@ -141,6 +141,19 @@ export default function AgentNavbar({
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Add Plot</span>
+          </Link>
+
+          <Link
+            href="/dashboard/money"
+            className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all touch-manipulation active:scale-95 ${
+              pathname.startsWith('/dashboard/money')
+                ? 'bg-slate-100 text-sky-700'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+            }`}
+            title="Money"
+            aria-label="Money"
+          >
+            <Wallet className="w-5 h-5" />
           </Link>
 
           <Link
