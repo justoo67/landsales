@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { prisma } from './prisma';
 import { getTokenSecret, SESSION_COOKIE_NAME } from './jwt-secret';
+import { parseAllowedEmails } from './allowlist';
 import type { AgentProfile } from '@prisma/client';
 
 const COOKIE_NAME = SESSION_COOKIE_NAME;
@@ -20,10 +21,7 @@ function isProduction(): boolean {
 
 /** Emails allowed to sign in. Empty means "nobody" in production. */
 export function allowedAgentEmails(): string[] {
-  return (process.env.ALLOWED_AGENT_EMAIL || '')
-    .split(',')
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+  return parseAllowedEmails(process.env.ALLOWED_AGENT_EMAIL);
 }
 
 export function isAllowedAgentEmail(email: string): boolean {
