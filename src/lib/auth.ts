@@ -69,30 +69,24 @@ export async function deleteSession() {
 }
 
 /**
- * Resolve the agent profile for a signed-in session, creating a bare profile
- * row if the account authenticated but has never completed setup.
+ * Resolve the agent profile behind a signed-in session.
  *
- * This replaces the old `ensureDefaultAgent`, which silently created an agent
- * with a known password.
+ * Returns null when the account no longer exists. Never creates a profile:
+ * accounts are only created by registration or Google sign-in, so deleting an
+ * agent cannot be silently undone by an old session cookie.
  */
-export async function ensureAgentForSession(
+export async function findAgentForSession(
   session: SessionPayload
-): Promise<AgentProfile> {
-  const byId = session.agentId
-    ? await prisma.agentProfile.findUnique({ where: { id: session.agentId } })
-    : null;
-  if (byId) return byId;
+): Promise<AgentProfile | null> {
+  if (session.agentId) {
+    const byId = await prisma.agentProfile.findUnique({
+      where: { id: session.agentId },
+    });
+    if (byId) return byId;
+  }
 
   const email = session.email.trim().toLowerCase();
-  const byEmail = await prisma.agentProfile.findUnique({ where: { email } });
-  if (byEmail) return byEmail;
-
-  return prisma.agentProfile.create({
-    data: {
-      email,
-      agentName: session.name || 'Land Sales Specialist',
-    },
-  });
+  return prisma.agentProfile.findUnique({ where: { email } });
 }
 
 export interface AgentAuth {
@@ -111,7 +105,8 @@ export async function requireAgent(): Promise<AgentAuth | null> {
   if (!session) return null;
 
   try {
-    const agent = await ensureAgentForSession(session);
+    const agent = await findAgentForSession(session);
+    if (!agent) return null;
     return { session, agentId: agent.id };
   } catch (err) {
     console.error('Resolve agent error:', err);

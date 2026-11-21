@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getSession, ensureAgentForSession } from '@/lib/auth';
+import { getSession, findAgentForSession } from '@/lib/auth';
 import { formatKes } from '@/lib/money';
 import { serializeMoney } from '@/lib/money.server';
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/lib/finance-types';
@@ -26,7 +26,10 @@ export default async function StatementPage({
   }
 
   const { id } = await params;
-  const agent = await ensureAgentForSession(session);
+  const agent = await findAgentForSession(session);
+  if (!agent) {
+    redirect('/login');
+  }
 
   const plot = await prisma.plot.findFirst({
     where: { id, deletedAt: null, agentId: agent.id },

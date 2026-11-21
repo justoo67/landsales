@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession, ensureAgentForSession } from '@/lib/auth';
+import { getSession, findAgentForSession } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
 export async function GET() {
@@ -10,7 +10,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const agent = await ensureAgentForSession(session);
+    const agent = await findAgentForSession(session);
+    if (!agent) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     return NextResponse.json({
       profile: {
@@ -39,10 +42,8 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const { agentName, whatsappNumber, customGreeting, currentPassword, newPassword } = body;
 
-    let agent;
-    try {
-      agent = await ensureAgentForSession(session);
-    } catch {
+    const agent = await findAgentForSession(session);
+    if (!agent) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
