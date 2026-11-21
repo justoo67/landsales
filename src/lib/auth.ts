@@ -2,7 +2,6 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { prisma } from './prisma';
 import { getTokenSecret, SESSION_COOKIE_NAME } from './jwt-secret';
-import { parseAllowedEmails } from './allowlist';
 import type { AgentProfile } from '@prisma/client';
 
 const COOKIE_NAME = SESSION_COOKIE_NAME;
@@ -19,21 +18,15 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
 }
 
-/** Emails allowed to sign in. Empty means "nobody" in production. */
-export function allowedAgentEmails(): string[] {
-  return parseAllowedEmails(process.env.ALLOWED_AGENT_EMAIL);
-}
-
-export function isAllowedAgentEmail(email: string): boolean {
-  const normalized = email.trim().toLowerCase();
-  const allowed = allowedAgentEmails();
-
-  if (allowed.length === 0) {
-    // Local development may run without an allowlist; production must not.
-    return !isProduction();
-  }
-
-  return allowed.includes(normalized);
+/**
+ * Maximum number of agent accounts this deployment accepts.
+ *
+ * Registration is open to anyone, so the cap is what keeps a public URL from
+ * filling up with strangers. Existing accounts can always sign in.
+ */
+export function maxAgentAccounts(): number {
+  const raw = Number(process.env.MAX_AGENT_ACCOUNTS);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 5;
 }
 
 export async function createSession(payload: SessionPayload) {

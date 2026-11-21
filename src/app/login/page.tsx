@@ -26,6 +26,9 @@ function AuthForm() {
 
   const getErrorMessage = (err: string | null): string | null => {
     if (!err) return null;
+    if (err === 'DeploymentFull') {
+      return 'This deployment is full — no more agent accounts can be created. Please contact the owner.';
+    }
     if (err === 'UnauthorizedAccountNotAllowed') {
       return 'This Google account is not approved. Please sign in with an authorized email or create a new agent account below.';
     }

@@ -84,7 +84,13 @@ export default async function ClientShowcasePage({ params }: PageProps) {
   const plot = await prisma.plot.findUnique({
     where: { id },
     include: {
-      agent: true,
+      agent: {
+        select: {
+          agentName: true,
+          whatsappNumber: true,
+          customGreeting: true,
+        },
+      },
       saleRecord: {
         include: {
           review: true,

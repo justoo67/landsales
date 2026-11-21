@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createSession, isAllowedAgentEmail } from '@/lib/auth';
+import { createSession, maxAgentAccounts } from '@/lib/auth';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -73,11 +73,19 @@ export async function GET(req: Request) {
 
       const googleEmail = googleUser.email.trim().toLowerCase();
 
-      if (!isAllowedAgentEmail(googleEmail)) {
-        console.warn(`Unauthorized Google sign-in attempt from: ${googleEmail}`);
-        return NextResponse.redirect(
-          new URL('/login?error=UnauthorizedAccountNotAllowed', req.url)
-        );
+      // Existing agents always get in; new ones must fit under the cap.
+      const existingAgent = await prisma.agentProfile.findUnique({
+        where: { email: googleEmail },
+        select: { id: true },
+      });
+
+      if (!existingAgent) {
+        const accountCount = await prisma.agentProfile.count();
+        if (accountCount >= maxAgentAccounts()) {
+          return NextResponse.redirect(
+            new URL('/login?error=DeploymentFull', req.url)
+          );
+        }
       }
 
       const agent = await prisma.agentProfile.upsert({
@@ -108,8 +116,7 @@ export async function GET(req: Request) {
 
   // Local development fallback: if credentials are not yet configured in local dev, allow quick sign-in
   if (process.env.NODE_ENV !== 'production' && !clientId) {
-    const allowedConfig = process.env.ALLOWED_AGENT_EMAIL || 'agent@example.com';
-    const defaultEmail = allowedConfig.split(',')[0].trim().toLowerCase();
+    const defaultEmail = 'agent@example.com';
     const agent =
       (await prisma.agentProfile.findUnique({ where: { email: defaultEmail } })) ||
       (await prisma.agentProfile.findFirst());

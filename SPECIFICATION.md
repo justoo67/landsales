@@ -108,7 +108,7 @@ The application is engineered primarily for iPhone / mobile field use adhering t
 1. **Security & Authentication:**
    * **Primary Mobile Login: Google OAuth 2.0** — Fast, 1-tap mobile sign-in without remembering or typing passwords on an iPhone keyboard.
    * **Secondary / Fallback: Email & Password** — Traditional credential login with secure hash (Argon2/bcrypt) for non-Google accounts or network restrictions.
-   * **Allowlist Protection:** Access is limited to verified addresses in `ALLOWED_AGENT_EMAIL` (comma- or newline-separated). Each address gets its own account and sees only its own data; unlisted third parties get a clean "Access Restricted" notice.
+   * **Open Registration with an Account Cap:** Anyone can create an account until the deployment reaches `MAX_AGENT_ACCOUNTS` (default 5). Every address gets its own account and sees only its own data. Existing accounts can always sign in.
    * **Persistent Mobile Sessions:** Long-lived secure sessions (JWT in HTTP-only, secure cookies) so the agent stays signed in when reopening Safari from the iPhone home screen.
 2. **KPI Counters:**
    * Total Plots

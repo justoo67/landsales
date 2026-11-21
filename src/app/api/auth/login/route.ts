@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createSession, isAllowedAgentEmail } from '@/lib/auth';
+import { createSession } from '@/lib/auth';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import bcrypt from 'bcryptjs';
 
@@ -25,11 +25,6 @@ export async function POST(req: Request) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-
-    // Allowlisted agents only, but each address signs in to its own account.
-    if (!isAllowedAgentEmail(normalizedEmail)) {
-      return NextResponse.json({ error: 'Access restricted' }, { status: 403 });
-    }
 
     const agent = await prisma.agentProfile.findUnique({
       where: { email: normalizedEmail },

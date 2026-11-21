@@ -62,7 +62,7 @@ single `configuration` row for user-editable presets.
 | D4 | **No offline writes.** Read cache via PWA only, later. | Sync/conflict resolution is not worth it at this stage. |
 | D5 | **WhatsApp deep links only.** No Business Cloud API. | Free, no number approval, no template restrictions. Every CTA prefills the message. |
 | D6 | Keep **Next.js + Prisma + Postgres**. | SSR for OG cards, single deploy target, already working. |
-| D7 | Single agent is explicit, but add `deletedAt`/timestamps so data is recoverable. | Cheap insurance; no multi-tenant plumbing yet. |
+| D7 | ~~Single agent is explicit, but add `deletedAt`/timestamps so data is recoverable.~~ **Superseded 2026-11-21:** every agent-owned table now has `agentId` and data is scoped per agent. | A second agent appeared in production, so the single-tenant shortcut became a data-leak risk. |
 
 ### 2.1 Non-goals
 
@@ -543,7 +543,7 @@ agent-facing safety net.
 | Scope grows past the five needs | Phase gates; anything not listed in §2.1 gets its own doc first |
 | WhatsApp automation expectations | Deep links only; document the limitation in the UI copy |
 | Money rounding regressions | Decimal everywhere + tests at the boundary |
-| Single-agent assumptions harden into the model | Add `agentId` when a second agent appears, not before; keep tables narrow |
+| ~~Single-agent assumptions harden into the model~~ | **Closed 2026-11-21:** `agentId` added to every agent-owned table and all routes scoped; backfilled to the oldest agent |
 | Phone numbers as identity | Normalise to E.164 on write, dedupe on the normalised value |
 | Losing payment history | Soft delete; no cascade from `Plot` to `SaleRecord` |
 

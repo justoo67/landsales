@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createSession, isAllowedAgentEmail } from '@/lib/auth';
+import { createSession, maxAgentAccounts } from '@/lib/auth';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import bcrypt from 'bcryptjs';
 
@@ -34,11 +34,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Single allowlist, many agents: any configured address may register, and
-    // each account gets its own AgentProfile. Data is scoped by agentId.
-    if (!isAllowedAgentEmail(normalizedEmail)) {
-      return NextResponse.json({ error: 'Access restricted' }, { status: 403 });
-    }
+    // Open registration, capped: anyone may create an account until the
+    // deployment fills up. Each account only sees its own data.
 
     // 2. Password validation
     if (!password || typeof password !== 'string') {
@@ -55,7 +52,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Check for existing account
+    // 3. Check for existing account, then enforce the account cap.
     const existingAgent = await prisma.agentProfile.findUnique({
       where: { email: normalizedEmail },
     });
@@ -63,6 +60,18 @@ export async function POST(req: Request) {
     if (existingAgent) {
       return NextResponse.json(
         { error: 'An account with this email already exists. Please sign in instead.' },
+        { status: 409 }
+      );
+    }
+
+    const accountCount = await prisma.agentProfile.count();
+    const maxAccounts = maxAgentAccounts();
+    if (accountCount >= maxAccounts) {
+      return NextResponse.json(
+        {
+          error: `This deployment is full (${maxAccounts} agent accounts). Ask the owner to remove an account first.`,
+          code: 'DEPLOYMENT_FULL',
+        },
         { status: 409 }
       );
     }
@@ -85,16 +94,68 @@ export async function POST(req: Request) {
         ? whatsappNumber.trim()
         : '+254700000000';
 
-    // 6. Create AgentProfile record
-    const newAgent = await prisma.agentProfile.create({
-      data: {
-        email: normalizedEmail,
-        passwordHash,
-        agentName: displayName,
-        whatsappNumber: phone,
-        customGreeting: "Hi! I'm inquiring about [Plot Title]. Is it still available?",
-      },
-    });
+    // 6. Create AgentProfile record. The count is re-checked inside a
+    // serializable transaction so two simultaneous sign-ups cannot slip past
+    // the cap.
+    let newAgent: {
+      id: string;
+      email: string;
+      agentName: string;
+      whatsappNumber: string;
+    };
+    try {
+      const result = await prisma.$transaction(
+        async (tx) => {
+          const count = await tx.agentProfile.count();
+          if (count >= maxAccounts) return { full: true as const };
+
+          const created = await tx.agentProfile.create({
+            data: {
+              email: normalizedEmail,
+              passwordHash,
+              agentName: displayName,
+              whatsappNumber: phone,
+              customGreeting:
+                "Hi! I'm inquiring about [Plot Title]. Is it still available?",
+            },
+          });
+
+          return { full: false as const, agent: created };
+        },
+        { isolationLevel: 'Serializable' }
+      );
+
+      if (result.full) {
+        return NextResponse.json(
+          {
+            error: `This deployment is full (${maxAccounts} agent accounts). Ask the owner to remove an account first.`,
+            code: 'DEPLOYMENT_FULL',
+          },
+          { status: 409 }
+        );
+      }
+
+      newAgent = result.agent;
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === 'P2002') {
+        return NextResponse.json(
+          {
+            error:
+              'An account with this email already exists. Please sign in instead.',
+          },
+          { status: 409 }
+        );
+      }
+      if (code === 'P2034') {
+        // Another sign-up committed at the same moment; ask for a retry.
+        return NextResponse.json(
+          { error: 'Sign-up is busy right now. Please try again.' },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     // 7. Establish active session
     await createSession({
