@@ -9,7 +9,7 @@ A mobile-first, high-converting web application tailored for real estate agents 
 - **Agent CRM & Deal Pipeline:** Track deals through the conveyancing process (`DEPOSIT_PAID` → `AGREEMENT_SIGNED` → `BALANCE_CLEARED` → `LCB_CONSENT` → `TITLE_ISSUED`).
 - **Payment Installments:** Log deposits, track installment schedules, and view remaining balances.
 - **Client-Facing Landing Pages:** Shareable short URLs (`/p/[id]`) with photo galleries, video walkthroughs, and direct WhatsApp inquiry integration.
-- **Google OAuth or Email/Password:** Single-agent access restricted by `ALLOWED_AGENT_EMAIL`.
+- **Google OAuth or Email/Password:** Multiple agent accounts, gated by the `ALLOWED_AGENT_EMAIL` allowlist. Every plot, buyer, lead, task, visit, document, comp and deal is scoped to the agent who owns it.
 - **Serverless Database:** PostgreSQL via Prisma, with versioned migrations.
 
 ## Tech Stack

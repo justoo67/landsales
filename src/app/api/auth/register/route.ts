@@ -34,23 +34,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // Single-agent deployment: only the configured address may register, and
-    // only one agent account may exist at a time.
+    // Single allowlist, many agents: any configured address may register, and
+    // each account gets its own AgentProfile. Data is scoped by agentId.
     if (!isAllowedAgentEmail(normalizedEmail)) {
       return NextResponse.json({ error: 'Access restricted' }, { status: 403 });
-    }
-
-    const existingAgentCount = await prisma.agentProfile.count();
-    if (existingAgentCount > 0) {
-      const existingForEmail = await prisma.agentProfile.findUnique({
-        where: { email: normalizedEmail },
-      });
-      if (!existingForEmail) {
-        return NextResponse.json(
-          { error: 'This deployment already has an agent account.' },
-          { status: 409 }
-        );
-      }
     }
 
     // 2. Password validation

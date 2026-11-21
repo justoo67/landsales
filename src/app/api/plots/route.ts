@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { plotJson } from '@/lib/serialize';
 import { requestMoney } from '@/lib/money.server';
 import { nanoid } from 'nanoid';
 
 export async function GET(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -16,7 +16,10 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
     const query = searchParams.get('query');
 
-    const where: Record<string, unknown> = { deletedAt: null };
+    const where: Record<string, unknown> = {
+      agentId: auth.agentId,
+      deletedAt: null,
+    };
 
     if (status && status !== 'ALL') {
       where.status = status.toUpperCase();
@@ -45,8 +48,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -93,6 +96,7 @@ export async function POST(req: Request) {
     const plot = await prisma.plot.create({
       data: {
         id,
+        agentId: auth.agentId,
         title,
         status,
         priceType,

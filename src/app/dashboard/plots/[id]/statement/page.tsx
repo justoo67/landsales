@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getSession, ensureAgentForSession } from '@/lib/auth';
 import { formatKes } from '@/lib/money';
 import { serializeMoney } from '@/lib/money.server';
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/lib/finance-types';
@@ -26,9 +26,10 @@ export default async function StatementPage({
   }
 
   const { id } = await params;
+  const agent = await ensureAgentForSession(session);
 
   const plot = await prisma.plot.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, agentId: agent.id },
     include: {
       saleRecord: {
         include: { installments: { orderBy: { paymentDate: 'asc' } } },
@@ -60,7 +61,6 @@ export default async function StatementPage({
   }
 
   const sale = plot.saleRecord;
-  const agent = await prisma.agentProfile.findFirst();
 
   const paid = sale.installments.reduce(
     (sum, payment) => sum + (serializeMoney(payment.amountKes) ?? 0),

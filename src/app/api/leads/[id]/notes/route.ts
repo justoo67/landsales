@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 
 const NOTE_TYPES = ['NOTE', 'CALL', 'WHATSAPP', 'STATUS'] as const;
@@ -10,8 +10,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,8 +24,8 @@ export async function POST(
       return NextResponse.json({ error: 'Note text is required' }, { status: 400 });
     }
 
-    const lead = await prisma.lead.findUnique({
-      where: { id },
+    const lead = await prisma.lead.findFirst({
+      where: { id, agentId: auth.agentId },
       select: { id: true, contactId: true, plotId: true },
     });
 
@@ -34,6 +34,7 @@ export async function POST(
     }
 
     const activity = await logActivity({
+      agentId: auth.agentId,
       type,
       body: text.slice(0, 4000),
       leadId: lead.id,

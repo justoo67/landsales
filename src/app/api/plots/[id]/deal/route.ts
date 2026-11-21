@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { saleRecordJson } from '@/lib/serialize';
 import {
   D,
@@ -14,14 +14,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    const deal = await prisma.saleRecord.findUnique({
-      where: { plotId: id },
+    const deal = await prisma.saleRecord.findFirst({
+      where: { plotId: id, plot: { agentId: auth.agentId } },
       include: {
         installments: {
           orderBy: { paymentDate: 'desc' },
@@ -61,8 +61,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -108,7 +108,7 @@ export async function POST(
 
     // 1. Ensure the plot exists and is not deleted
     const plot = await prisma.plot.findFirst({
-      where: { id: plotId, deletedAt: null },
+      where: { id: plotId, deletedAt: null, agentId: auth.agentId },
       select: { id: true },
     });
 
@@ -123,8 +123,8 @@ export async function POST(
     });
 
     // 3. Check if deal already exists for this plot
-    const existingDeal = await prisma.saleRecord.findUnique({
-      where: { plotId },
+    const existingDeal = await prisma.saleRecord.findFirst({
+      where: { plotId, plot: { agentId: auth.agentId } },
     });
 
     const customFieldsString = Array.isArray(buyerCustomFields)

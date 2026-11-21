@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { saleRecordJson } from '@/lib/serialize';
 import {
   requestMoney,
@@ -15,8 +15,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -48,8 +48,8 @@ export async function POST(
       );
     }
 
-    const deal = await prisma.saleRecord.findUnique({
-      where: { plotId },
+    const deal = await prisma.saleRecord.findFirst({
+      where: { plotId, plot: { agentId: auth.agentId } },
       include: { installments: true },
     });
 

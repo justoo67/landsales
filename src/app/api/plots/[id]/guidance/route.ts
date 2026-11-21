@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { serializeMoney } from '@/lib/money.server';
 import { compJson } from '@/lib/comps';
 import { computeGuidance, deviationPercent, MIN_COMPS } from '@/lib/pricing';
@@ -11,15 +11,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
 
     const plot = await prisma.plot.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, agentId: auth.agentId },
       select: {
         id: true,
         title: true,
@@ -64,6 +64,7 @@ export async function GET(
     }
 
     const countyWhere = {
+      agentId: auth.agentId,
       county: { equals: plot.county, mode: 'insensitive' as const },
     };
 

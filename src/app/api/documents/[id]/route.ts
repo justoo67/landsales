@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 
 /**
  * Removes the document record. The stored object is left in R2; storage
@@ -11,14 +11,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
 
-    const document = await prisma.document.findUnique({ where: { id } });
+    const document = await prisma.document.findFirst({
+      where: { id, agentId: auth.agentId },
+    });
     if (!document) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }

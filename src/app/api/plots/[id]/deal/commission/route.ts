@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { D, serializeMoney } from '@/lib/money.server';
 import {
@@ -14,14 +14,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id: plotId } = await params;
-    const sale = await prisma.saleRecord.findUnique({
-      where: { plotId },
+    const sale = await prisma.saleRecord.findFirst({
+      where: { plotId, plot: { agentId: auth.agentId } },
       include: { commission: true },
     });
 
@@ -41,16 +41,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id: plotId } = await params;
     const body = await req.json();
 
-    const sale = await prisma.saleRecord.findUnique({
-      where: { plotId },
+    const sale = await prisma.saleRecord.findFirst({
+      where: { plotId, plot: { agentId: auth.agentId } },
       include: { commission: true },
     });
 
@@ -113,6 +113,7 @@ export async function PATCH(
     });
 
     await logActivity({
+      agentId: auth.agentId,
       type: 'PAYMENT',
       body:
         status === 'PAID'

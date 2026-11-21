@@ -84,6 +84,7 @@ export default async function ClientShowcasePage({ params }: PageProps) {
   const plot = await prisma.plot.findUnique({
     where: { id },
     include: {
+      agent: true,
       saleRecord: {
         include: {
           review: true,
@@ -96,7 +97,7 @@ export default async function ClientShowcasePage({ params }: PageProps) {
     notFound();
   }
 
-  const agent = await prisma.agentProfile.findFirst();
+  const agent = plot.agent;
   const agentName = agent?.agentName || 'Land Specialist';
   const whatsappNum = (agent?.whatsappNumber || '+254700000000').replace(/[^0-9]/g, '');
 

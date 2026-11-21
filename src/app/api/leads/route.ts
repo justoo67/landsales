@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { normalizePhone } from '@/lib/phone';
 import { requestMoney } from '@/lib/money.server';
@@ -16,8 +16,8 @@ const leadInclude = {
 
 export async function GET(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     const stage = searchParams.get('stage');
     const query = searchParams.get('query')?.trim();
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { agentId: auth.agentId };
 
     if (stage && stage !== 'ALL') {
       where.stage = stage;
@@ -61,8 +61,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     let plotId: string | null = null;
     if (typeof body.plotId === 'string' && body.plotId.trim()) {
       const plot = await prisma.plot.findFirst({
-        where: { id: body.plotId.trim(), deletedAt: null },
+        where: { id: body.plotId.trim(), deletedAt: null, agentId: auth.agentId },
         select: { id: true },
       });
       if (!plot) {
@@ -106,15 +106,18 @@ export async function POST(req: Request) {
 
     const lead = await prisma.$transaction(async (tx) => {
       const contact = await tx.contact.upsert({
-        where: { phone },
+        where: { agentId_phone: { agentId: auth.agentId, phone } },
         update: { name },
-        create: { name, phone, source },
+        create: { agentId: auth.agentId, name, phone, source },
       });
 
-      const index = await tx.lead.count({ where: { stage: 'INQUIRY' } });
+      const index = await tx.lead.count({
+        where: { agentId: auth.agentId, stage: 'INQUIRY' },
+      });
 
       const created = await tx.lead.create({
         data: {
+          agentId: auth.agentId,
           contactId: contact.id,
           plotId,
           stage: 'INQUIRY',
@@ -129,6 +132,7 @@ export async function POST(req: Request) {
 
       await logActivity(
         {
+          agentId: auth.agentId,
           type: 'LEAD_CREATED',
           body: `Lead added${plotId ? ' for a plot' : ''}`,
           leadId: created.id,

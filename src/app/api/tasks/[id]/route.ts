@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { syncLeadNextAction, taskJson } from '@/lib/tasks';
 import { isTaskType, TASK_PRIORITIES } from '@/lib/task-types';
@@ -22,15 +22,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await req.json();
 
-    const existing = await prisma.task.findUnique({ where: { id } });
+    const existing = await prisma.task.findFirst({
+      where: { id, agentId: auth.agentId },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
@@ -82,6 +84,7 @@ export async function PATCH(
       if (activity) {
         await logActivity(
           {
+            agentId: auth.agentId,
             type: activity.type,
             body: activity.body,
             leadId: existing.leadId,
@@ -108,14 +111,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
 
-    const existing = await prisma.task.findUnique({ where: { id } });
+    const existing = await prisma.task.findFirst({
+      where: { id, agentId: auth.agentId },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }

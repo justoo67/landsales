@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
     const plot = await prisma.plot.findFirst({
       where: { id: plotId, deletedAt: null },
-      select: { id: true, title: true, status: true },
+      select: { id: true, title: true, status: true, agentId: true },
     });
 
     if (!plot) {
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
     // Anonymous tap: still useful signal, no junk contact.
     if (!name || !phone) {
       await logActivity({
+        agentId: plot.agentId,
         type: 'INQUIRY',
         body: `Listing link opened for ${plot.title}`,
         plotId: plot.id,
@@ -56,13 +57,14 @@ export async function POST(req: Request) {
 
     const result = await prisma.$transaction(async (tx) => {
       const contact = await tx.contact.upsert({
-        where: { phone },
+        where: { agentId_phone: { agentId: plot.agentId, phone } },
         update: { name },
-        create: { name, phone, source: 'INQUIRY' },
+        create: { agentId: plot.agentId, name, phone, source: 'INQUIRY' },
       });
 
       const recentLead = await tx.lead.findFirst({
         where: {
+          agentId: plot.agentId,
           contactId: contact.id,
           plotId: plot.id,
           stage: { notIn: ['LOST', 'CLOSED'] },
@@ -73,6 +75,7 @@ export async function POST(req: Request) {
       if (recentLead) {
         await logActivity(
           {
+            agentId: plot.agentId,
             type: 'INQUIRY',
             body: `Repeat inquiry on ${plot.title}`,
             leadId: recentLead.id,
@@ -86,6 +89,7 @@ export async function POST(req: Request) {
 
       const lead = await tx.lead.create({
         data: {
+          agentId: plot.agentId,
           contactId: contact.id,
           plotId: plot.id,
           stage: 'INQUIRY',
@@ -96,6 +100,7 @@ export async function POST(req: Request) {
 
       await logActivity(
         {
+          agentId: plot.agentId,
           type: 'INQUIRY',
           body: `Inquired about ${plot.title} from the shared link`,
           leadId: lead.id,

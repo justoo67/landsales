@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { requestMoney } from '@/lib/money.server';
 import { compJson } from '@/lib/comps';
 
@@ -9,15 +9,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await req.json();
 
-    const existing = await prisma.comparable.findUnique({ where: { id } });
+    const existing = await prisma.comparable.findFirst({
+      where: { id, agentId: auth.agentId },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'Comparable not found' }, { status: 404 });
     }
@@ -90,13 +92,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    await prisma.comparable.delete({ where: { id } });
+    const deleted = await prisma.comparable.deleteMany({
+      where: { id, agentId: auth.agentId },
+    });
+
+    if (deleted.count === 0) {
+      return NextResponse.json({ error: 'Comparable not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

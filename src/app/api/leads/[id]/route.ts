@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { requestMoney } from '@/lib/money.server';
 import { leadJson, LEAD_SOURCES } from '@/lib/leads';
@@ -19,14 +19,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    const lead = await prisma.lead.findUnique({
-      where: { id },
+    const lead = await prisma.lead.findFirst({
+      where: { id, agentId: auth.agentId },
       include: detailInclude,
     });
 
@@ -46,16 +46,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await req.json();
 
-    const existing = await prisma.lead.findUnique({
-      where: { id },
+    const existing = await prisma.lead.findFirst({
+      where: { id, agentId: auth.agentId },
       select: { id: true, contactId: true, plotId: true },
     });
 
@@ -70,7 +70,7 @@ export async function PATCH(
         data.plotId = null;
       } else {
         const plot = await prisma.plot.findFirst({
-          where: { id: String(body.plotId), deletedAt: null },
+          where: { id: String(body.plotId), deletedAt: null, agentId: auth.agentId },
           select: { id: true },
         });
         if (!plot) {
@@ -112,6 +112,7 @@ export async function PATCH(
 
     if (data.plotId !== undefined && data.plotId !== existing.plotId) {
       await logActivity({
+        agentId: auth.agentId,
         type: 'STAGE_CHANGED',
         body: 'Linked plot updated',
         leadId: lead.id,
@@ -133,13 +134,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    await prisma.lead.delete({ where: { id } });
+    const deleted = await prisma.lead.deleteMany({
+      where: { id, agentId: auth.agentId },
+    });
+
+    if (deleted.count === 0) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

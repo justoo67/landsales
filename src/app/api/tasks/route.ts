@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { syncLeadNextAction, taskJson } from '@/lib/tasks';
 import { isTaskType, TASK_PRIORITIES, taskTypeLabel } from '@/lib/task-types';
@@ -29,8 +29,8 @@ function endOfToday() {
 
 export async function GET(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -38,7 +38,10 @@ export async function GET(req: Request) {
     const scope = searchParams.get('scope') || 'open';
 
     const tasks = await prisma.task.findMany({
-      where: scope === 'all' ? {} : { doneAt: null },
+      where: {
+        agentId: auth.agentId,
+        ...(scope === 'all' ? {} : { doneAt: null }),
+      },
       include: taskInclude,
       orderBy: [{ doneAt: 'asc' }, { dueAt: 'asc' }],
       take: 200,
@@ -66,8 +69,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -91,8 +94,8 @@ export async function POST(req: Request) {
     let plotId: string | null = null;
 
     if (typeof body.leadId === 'string' && body.leadId.trim()) {
-      const lead = await prisma.lead.findUnique({
-        where: { id: body.leadId.trim() },
+      const lead = await prisma.lead.findFirst({
+        where: { id: body.leadId.trim(), agentId: auth.agentId },
         select: { id: true, contactId: true, plotId: true },
       });
       if (!lead) {
@@ -105,7 +108,7 @@ export async function POST(req: Request) {
 
     if (typeof body.plotId === 'string' && body.plotId.trim()) {
       const plot = await prisma.plot.findFirst({
-        where: { id: body.plotId.trim(), deletedAt: null },
+        where: { id: body.plotId.trim(), deletedAt: null, agentId: auth.agentId },
         select: { id: true },
       });
       if (!plot) {
@@ -115,12 +118,32 @@ export async function POST(req: Request) {
     }
 
     if (typeof body.contactId === 'string' && body.contactId.trim()) {
-      contactId = body.contactId.trim();
+      const contact = await prisma.contact.findFirst({
+        where: { id: body.contactId.trim(), agentId: auth.agentId },
+        select: { id: true },
+      });
+      if (!contact) {
+        return NextResponse.json({ error: 'Buyer not found' }, { status: 404 });
+      }
+      contactId = contact.id;
+    }
+
+    let saleId: string | null = null;
+    if (typeof body.saleId === 'string' && body.saleId.trim()) {
+      const sale = await prisma.saleRecord.findFirst({
+        where: { id: body.saleId.trim(), plot: { agentId: auth.agentId } },
+        select: { id: true },
+      });
+      if (!sale) {
+        return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
+      }
+      saleId = sale.id;
     }
 
     const task = await prisma.$transaction(async (tx) => {
       const created = await tx.task.create({
         data: {
+          agentId: auth.agentId,
           title: title.slice(0, 200),
           type,
           priority,
@@ -129,13 +152,14 @@ export async function POST(req: Request) {
           leadId,
           contactId,
           plotId,
-          saleId: typeof body.saleId === 'string' ? body.saleId : null,
+          saleId,
         },
         include: taskInclude,
       });
 
       await logActivity(
         {
+          agentId: auth.agentId,
           type: 'TASK_CREATED',
           body: `${taskTypeLabel(type)}: ${created.title}`,
           leadId,

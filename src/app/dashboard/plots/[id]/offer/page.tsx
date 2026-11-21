@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getSession, ensureAgentForSession } from '@/lib/auth';
 import { formatKes } from '@/lib/money';
 import { acresFromPreset, formatAcres, pricePerAcre } from '@/lib/units';
 import PrintButton from '@/components/pricing/PrintButton';
@@ -17,13 +17,15 @@ export default async function OfferSheetPage({
   }
 
   const { id } = await params;
-  const plot = await prisma.plot.findFirst({ where: { id, deletedAt: null } });
+  const agent = await ensureAgentForSession(session);
+  const plot = await prisma.plot.findFirst({
+    where: { id, deletedAt: null, agentId: agent.id },
+  });
 
   if (!plot) {
     notFound();
   }
 
-  const agent = await prisma.agentProfile.findFirst();
   const acres = acresFromPreset(plot.sizePreset, plot.sizeCustomValue);
   const price = plot.priceKes ? Number(plot.priceKes) : null;
   const perAcre = price ? pricePerAcre(price, acres) : null;

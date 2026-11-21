@@ -101,3 +101,27 @@ export async function ensureAgentForSession(
     },
   });
 }
+
+export interface AgentAuth {
+  session: SessionPayload;
+  agentId: string;
+}
+
+/**
+ * Resolve the signed-in agent for a route handler.
+ *
+ * Data is scoped per agent, so every query must filter on the returned
+ * `agentId`. Returns null when there is no valid session; callers answer 401.
+ */
+export async function requireAgent(): Promise<AgentAuth | null> {
+  const session = await getSession();
+  if (!session) return null;
+
+  try {
+    const agent = await ensureAgentForSession(session);
+    return { session, agentId: agent.id };
+  } catch (err) {
+    console.error('Resolve agent error:', err);
+    return null;
+  }
+}

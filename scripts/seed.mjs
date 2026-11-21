@@ -15,7 +15,7 @@ async function main() {
       return generated;
     })();
   const passwordHash = await bcrypt.hash(seedPassword, 10);
-  await prisma.agentProfile.upsert({
+  const agent = await prisma.agentProfile.upsert({
     where: { email: 'agent@example.com' },
     update: {},
     create: {
@@ -98,7 +98,7 @@ async function main() {
     await prisma.plot.upsert({
       where: { id: plot.id },
       update: {},
-      create: plot,
+      create: { ...plot, agentId: agent.id },
     });
   }
 

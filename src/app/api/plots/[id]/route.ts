@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { plotJson } from '@/lib/serialize';
 import { requestMoney } from '@/lib/money.server';
 
@@ -9,14 +9,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const plot = await prisma.plot.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, agentId: auth.agentId },
     });
 
     if (!plot) {
@@ -35,8 +35,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -44,7 +44,7 @@ export async function PATCH(
     const body = await req.json();
 
     const existing = await prisma.plot.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, agentId: auth.agentId },
       select: { id: true },
     });
 
@@ -105,8 +105,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -114,7 +114,7 @@ export async function DELETE(
     const confirm = new URL(req.url).searchParams.get('confirm') === 'true';
 
     const plot = await prisma.plot.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, agentId: auth.agentId },
       include: { saleRecord: { select: { id: true } } },
     });
 

@@ -9,11 +9,13 @@ generator client {
 }
 
 model Plot {
-  id               String      @id // Unguessable short ID (nanoid) e.g., "m8x2k4p9q1"
+  id               String       @id // Unguessable short ID (nanoid) e.g., "m8x2k4p9q1"
+  agentId          String
+  agent            AgentProfile @relation(fields: [agentId], references: [id], onDelete: Restrict)
   title            String
-  status           String      @default("AVAILABLE") // AVAILABLE, PENDING, SOLD
-  priceType        String      @default("FIXED") // FIXED, CONTACT_AGENT
-  priceKes         Decimal?    @db.Decimal(14, 2)
+  status           String       @default("AVAILABLE") // AVAILABLE, PENDING, SOLD
+  priceType        String       @default("FIXED") // FIXED, CONTACT_AGENT
+  priceKes         Decimal?     @db.Decimal(14, 2)
   sizePreset       String // "50x100", "40x80", "100x100", "ACRES", "HECTARES", "SQM", "CUSTOM"
   sizeCustomValue  String? // e.g. "0.5", "2.5", "100x150 ft"
   county           String?
@@ -29,8 +31,8 @@ model Plot {
   photos           String // JSON string of photo URLs/paths
   videoUrl         String? // Video URL/path
   customAttributes String? // JSON string of custom key-value features
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
   deletedAt        DateTime? // Soft delete; payment history must survive
   saleRecord       SaleRecord?
   leads            Lead[]
@@ -39,7 +41,7 @@ model Plot {
   visits           SiteVisit[]
   documents        Document[]
 
-  @@index([deletedAt, status])
+  @@index([agentId, deletedAt, status])
 }
 
 model SaleRecord {
@@ -95,131 +97,152 @@ model BuyerReview {
 }
 
 model AgentProfile {
-  id             String   @id @default(cuid())
-  agentName      String   @default("Land Sales Specialist")
-  email          String   @unique @default("agent@example.com")
+  id             String       @id @default(cuid())
+  agentName      String       @default("Land Sales Specialist")
+  email          String       @unique
   passwordHash   String?
-  whatsappNumber String   @default("+254700000000")
-  customGreeting String?  @default("Hi! I'm inquiring about [Plot Title]. Is it still available?")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  whatsappNumber String       @default("+254700000000")
+  customGreeting String?      @default("Hi! I'm inquiring about [Plot Title]. Is it still available?")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  plots          Plot[]
+  contacts       Contact[]
+  leads          Lead[]
+  activities     Activity[]
+  tasks          Task[]
+  visits         SiteVisit[]
+  documents      Document[]
+  comparables    Comparable[]
 }
 
 model Contact {
-  id         String     @id @default(cuid())
+  id         String       @id @default(cuid())
+  agentId    String
+  agent      AgentProfile @relation(fields: [agentId], references: [id], onDelete: Cascade)
   name       String
-  phone      String     @unique // normalised E.164, the dedupe key
+  phone      String // normalised E.164, dedupe key per agent
   altPhone   String?
   email      String?
-  source     String     @default("FIELD") // WHATSAPP|REFERRAL|WALK_IN|SIGN|SOCIAL|REPEAT|INQUIRY|FIELD
+  source     String       @default("FIELD") // WHATSAPP|REFERRAL|WALK_IN|SIGN|SOCIAL|REPEAT|INQUIRY|FIELD
   tags       String[]
   notes      String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
   leads      Lead[]
   tasks      Task[]
   activities Activity[]
   documents  Document[]
 
-  @@index([name])
+  @@unique([agentId, phone])
+  @@index([agentId, name])
 }
 
 model Lead {
-  id           String      @id @default(cuid())
+  id           String       @id @default(cuid())
+  agentId      String
+  agent        AgentProfile @relation(fields: [agentId], references: [id], onDelete: Cascade)
   contactId    String
-  contact      Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
   plotId       String?
-  plot         Plot?       @relation(fields: [plotId], references: [id], onDelete: SetNull)
-  stage        String      @default("INQUIRY")
+  plot         Plot?        @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  stage        String       @default("INQUIRY")
   // INQUIRY|CONTACTED|SITE_VISIT|OFFER|DEPOSIT|CLOSED|LOST
-  index        Int         @default(0)
-  source       String      @default("FIELD")
-  budgetMinKes Decimal?    @db.Decimal(14, 2)
-  budgetMaxKes Decimal?    @db.Decimal(14, 2)
+  index        Int          @default(0)
+  source       String       @default("FIELD")
+  budgetMinKes Decimal?     @db.Decimal(14, 2)
+  budgetMaxKes Decimal?     @db.Decimal(14, 2)
   lostReason   String?
   nextActionAt DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  saleId       String?     @unique
-  sale         SaleRecord? @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  saleId       String?      @unique
+  sale         SaleRecord?  @relation(fields: [saleId], references: [id], onDelete: SetNull)
   tasks        Task[]
   activities   Activity[]
   visits       SiteVisit[]
 
-  @@index([stage, index])
-  @@index([nextActionAt])
+  @@index([agentId, stage, index])
+  @@index([agentId, nextActionAt])
   @@index([contactId])
   @@index([plotId])
 }
 
 model Activity {
-  id        String      @id @default(cuid())
+  id        String       @id @default(cuid())
+  agentId   String
+  agent     AgentProfile @relation(fields: [agentId], references: [id], onDelete: Cascade)
   type      String
   // INQUIRY|LEAD_CREATED|STAGE_CHANGED|NOTE|CALL|WHATSAPP|PAYMENT|DOCUMENT|STATUS
   body      String?
   metadata  Json?
   contactId String?
-  contact   Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   leadId    String?
-  lead      Lead?       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead      Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
   plotId    String?
-  plot      Plot?       @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  plot      Plot?        @relation(fields: [plotId], references: [id], onDelete: SetNull)
   saleId    String?
-  sale      SaleRecord? @relation(fields: [saleId], references: [id], onDelete: SetNull)
-  createdAt DateTime    @default(now())
+  sale      SaleRecord?  @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  createdAt DateTime     @default(now())
 
-  @@index([createdAt])
+  @@index([agentId, createdAt])
   @@index([leadId, createdAt])
   @@index([contactId, createdAt])
 }
 
 model Task {
-  id        String      @id @default(cuid())
+  id        String       @id @default(cuid())
+  agentId   String
+  agent     AgentProfile @relation(fields: [agentId], references: [id], onDelete: Cascade)
   title     String
-  type      String      @default("FOLLOW_UP") // CALL|WHATSAPP|SMS|SITE_VISIT|DOCUMENT|PAYMENT|FOLLOW_UP
+  type      String       @default("FOLLOW_UP") // CALL|WHATSAPP|SMS|SITE_VISIT|DOCUMENT|PAYMENT|FOLLOW_UP
   dueAt     DateTime
   doneAt    DateTime?
-  priority  String      @default("NORMAL") // LOW|NORMAL|HIGH
+  priority  String       @default("NORMAL") // LOW|NORMAL|HIGH
   notes     String?
   contactId String?
-  contact   Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   leadId    String?
-  lead      Lead?       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead      Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
   plotId    String?
-  plot      Plot?       @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  plot      Plot?        @relation(fields: [plotId], references: [id], onDelete: Cascade)
   saleId    String?
-  sale      SaleRecord? @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  sale      SaleRecord?  @relation(fields: [saleId], references: [id], onDelete: Cascade)
   visit     SiteVisit?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  @@index([doneAt, dueAt])
+  @@index([agentId, doneAt, dueAt])
   @@index([leadId, doneAt])
   @@index([plotId, doneAt])
 }
 
 model SiteVisit {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
+  agentId     String
+  agent       AgentProfile @relation(fields: [agentId], references: [id], onDelete: Cascade)
   leadId      String
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
   plotId      String?
-  plot        Plot?    @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  plot        Plot?        @relation(fields: [plotId], references: [id], onDelete: SetNull)
   scheduledAt DateTime
-  status      String   @default("SCHEDULED") // SCHEDULED|COMPLETED|NO_SHOW|CANCELLED
+  status      String       @default("SCHEDULED") // SCHEDULED|COMPLETED|NO_SHOW|CANCELLED
   feedback    String?
   rating      Int?
-  taskId      String?  @unique
-  task        Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  taskId      String?      @unique
+  task        Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  @@index([scheduledAt, status])
+  @@index([agentId, scheduledAt, status])
   @@index([leadId, scheduledAt])
   @@index([plotId])
 }
 
 model Document {
-  id        String      @id @default(cuid())
+  id        String       @id @default(cuid())
+  agentId   String
+  agent     AgentProfile @relation(fields: [agentId], references: [id], onDelete: Cascade)
   kind      String // TITLE_DEED|AGREEMENT|RECEIPT|ID_COPY|MAP|SURVEY|CONSENT|OTHER
   name      String
   url       String
@@ -227,39 +250,42 @@ model Document {
   mimeType  String?
   sizeBytes Int?
   plotId    String?
-  plot      Plot?       @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  plot      Plot?        @relation(fields: [plotId], references: [id], onDelete: Cascade)
   saleId    String?
-  sale      SaleRecord? @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  sale      SaleRecord?  @relation(fields: [saleId], references: [id], onDelete: Cascade)
   contactId String?
-  contact   Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  createdAt DateTime    @default(now())
+  contact   Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
 
+  @@index([agentId, createdAt])
   @@index([plotId, createdAt])
   @@index([saleId, createdAt])
   @@index([contactId, createdAt])
 }
 
 model Comparable {
-  id           String   @id @default(cuid())
+  id           String       @id @default(cuid())
+  agentId      String
+  agent        AgentProfile @relation(fields: [agentId], references: [id], onDelete: Cascade)
   county       String
   ward         String?
   locationName String
   latitude     Float?
   longitude    Float?
-  sizeAcres    Decimal  @db.Decimal(10, 4)
-  priceKes     Decimal  @db.Decimal(14, 2)
-  pricePerAcre Decimal  @db.Decimal(14, 2) // computed on write
-  kind         String   @default("SALE") // SALE|LISTING
-  source       String   @default("AGENT") // AGENT|PORTAL|PUBLIC_RECORD|HEARD
+  sizeAcres    Decimal      @db.Decimal(10, 4)
+  priceKes     Decimal      @db.Decimal(14, 2)
+  pricePerAcre Decimal      @db.Decimal(14, 2) // computed on write
+  kind         String       @default("SALE") // SALE|LISTING
+  source       String       @default("AGENT") // AGENT|PORTAL|PUBLIC_RECORD|HEARD
   sourceUrl    String?
-  observedAt   DateTime @default(now())
-  verified     Boolean  @default(false)
+  observedAt   DateTime     @default(now())
+  verified     Boolean      @default(false)
   notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-  @@index([county, ward, observedAt])
-  @@index([observedAt])
+  @@index([agentId, county, ward, observedAt])
+  @@index([agentId, observedAt])
 }
 
 model Commission {

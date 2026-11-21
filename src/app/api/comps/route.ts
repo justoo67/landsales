@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { requestMoney } from '@/lib/money.server';
 import { compJson } from '@/lib/comps';
 
@@ -9,8 +9,8 @@ const COMP_SOURCES = ['AGENT', 'PORTAL', 'PUBLIC_RECORD', 'HEARD'];
 
 export async function GET(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     const ward = searchParams.get('ward');
     const query = searchParams.get('q')?.trim();
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { agentId: auth.agentId };
     if (county) where.county = { equals: county, mode: 'insensitive' };
     if (ward) where.ward = { equals: ward, mode: 'insensitive' };
     if (query) {
@@ -46,8 +46,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -91,6 +91,7 @@ export async function POST(req: Request) {
 
     const comp = await prisma.comparable.create({
       data: {
+        agentId: auth.agentId,
         county: county.slice(0, 120),
         ward: ward ? ward.slice(0, 120) : null,
         locationName: locationName.slice(0, 160),

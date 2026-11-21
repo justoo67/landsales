@@ -27,7 +27,7 @@ Vercel dashboard, never in the repo.
 | `DATABASE_URL` | yes | Neon pooled connection |
 | `DIRECT_URL` | yes | Neon direct connection, used by migrations |
 | `JWT_SECRET` | yes | 32+ chars; the app refuses to sign sessions without it |
-| `ALLOWED_AGENT_EMAIL` | yes | only this address may sign in or register |
+| `ALLOWED_AGENT_EMAIL` | yes | addresses allowed to sign in or register; comma- or newline-separated |
 | `NEXT_PUBLIC_APP_URL` | yes | production origin, used for OAuth redirects and OG URLs |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | password sign-in works without it |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `NEXT_PUBLIC_R2_PUBLIC_URL` | optional | without these, uploads fall back to `public/uploads` and vanish on redeploy |

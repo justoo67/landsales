@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 async function main() {
   const sales = await prisma.saleRecord.findMany({
     where: { lead: { is: null } },
-    include: { plot: { select: { id: true, title: true } } },
+    include: { plot: { select: { id: true, title: true, agentId: true } } },
   });
 
   if (sales.length === 0) {
@@ -26,11 +26,17 @@ async function main() {
 
   for (const sale of sales) {
     const phone = normalizePhone(sale.buyerPhone) ?? sale.buyerPhone.trim();
+    const agentId = sale.plot?.agentId;
+    if (!agentId) {
+      console.warn(`Skipping ${sale.buyerName}: sale plot is not owned by an agent.`);
+      continue;
+    }
 
     const contact = await prisma.contact.upsert({
-      where: { phone },
+      where: { agentId_phone: { agentId, phone } },
       update: {},
       create: {
+        agentId,
         name: sale.buyerName,
         phone,
         source: 'FIELD',
@@ -40,6 +46,7 @@ async function main() {
 
     await prisma.lead.create({
       data: {
+        agentId,
         contactId: contact.id,
         plotId: sale.plotId,
         stage: 'CLOSED',
@@ -51,6 +58,7 @@ async function main() {
 
     await prisma.activity.create({
       data: {
+        agentId,
         type: 'LEAD_CREATED',
         body: `Imported from the sale record for ${sale.plot?.title ?? 'a plot'}`,
         contactId: contact.id,

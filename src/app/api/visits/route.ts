@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { syncLeadNextAction } from '@/lib/tasks';
 import { isVisitStatus } from '@/lib/visits';
@@ -23,8 +23,8 @@ function startOfToday() {
 
 export async function GET(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     const from = fromParam ? new Date(fromParam) : startOfToday();
     const to = toParam ? new Date(toParam) : new Date(from.getTime() + 7 * 86_400_000);
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { agentId: auth.agentId };
 
     if (leadId) {
       where.leadId = leadId;
@@ -64,8 +64,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -81,8 +81,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'A valid visit date is required' }, { status: 400 });
     }
 
-    const lead = await prisma.lead.findUnique({
-      where: { id: leadId },
+    const lead = await prisma.lead.findFirst({
+      where: { id: leadId, agentId: auth.agentId },
       include: {
         contact: { select: { name: true } },
         plot: { select: { id: true, title: true } },
@@ -96,6 +96,7 @@ export async function POST(req: Request) {
     const result = await prisma.$transaction(async (tx) => {
       const visit = await tx.siteVisit.create({
         data: {
+          agentId: auth.agentId,
           leadId: lead.id,
           plotId: lead.plotId,
           scheduledAt,
@@ -105,6 +106,7 @@ export async function POST(req: Request) {
 
       const task = await tx.task.create({
         data: {
+          agentId: auth.agentId,
           title: `Site visit: ${lead.contact.name}${
             lead.plot ? ` · ${lead.plot.title}` : ''
           }`,
@@ -123,6 +125,7 @@ export async function POST(req: Request) {
 
       await logActivity(
         {
+          agentId: auth.agentId,
           type: 'SITE_VISIT',
           body: `Site visit scheduled for ${scheduledAt.toLocaleString('en-KE')}`,
           leadId: lead.id,

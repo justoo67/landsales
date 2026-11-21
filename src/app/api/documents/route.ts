@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { isDocumentKind, MAX_DOCUMENT_BYTES } from '@/lib/document-types';
 
@@ -10,8 +10,8 @@ import { isDocumentKind, MAX_DOCUMENT_BYTES } from '@/lib/document-types';
  */
 export async function GET(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -29,6 +29,7 @@ export async function GET(req: Request) {
 
     const documents = await prisma.document.findMany({
       where: {
+        agentId: auth.agentId,
         ...(plotId ? { plotId } : {}),
         ...(saleId ? { saleId } : {}),
         ...(contactId ? { contactId } : {}),
@@ -45,8 +46,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -81,22 +82,32 @@ export async function POST(req: Request) {
 
     if (plotId) {
       const plot = await prisma.plot.findFirst({
-        where: { id: plotId, deletedAt: null },
+        where: { id: plotId, deletedAt: null, agentId: auth.agentId },
         select: { id: true },
       });
       if (!plot) return NextResponse.json({ error: 'Plot not found' }, { status: 404 });
     }
 
     if (saleId) {
-      const sale = await prisma.saleRecord.findUnique({
-        where: { id: saleId },
+      const sale = await prisma.saleRecord.findFirst({
+        where: { id: saleId, plot: { agentId: auth.agentId } },
         select: { id: true },
       });
       if (!sale) return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
     }
 
+    if (contactId) {
+      const contact = await prisma.contact.findFirst({
+        where: { id: contactId, agentId: auth.agentId },
+        select: { id: true },
+      });
+      if (!contact)
+        return NextResponse.json({ error: 'Buyer not found' }, { status: 404 });
+    }
+
     const document = await prisma.document.create({
       data: {
+        agentId: auth.agentId,
         kind,
         name: name.slice(0, 200),
         url: url.slice(0, 1000),
@@ -110,6 +121,7 @@ export async function POST(req: Request) {
     });
 
     await logActivity({
+      agentId: auth.agentId,
       type: 'DOCUMENT',
       body: `Document added: ${document.name}`,
       plotId,

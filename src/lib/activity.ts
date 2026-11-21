@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 
 export interface ActivityInput {
+  agentId: string;
   type: string;
   body?: string | null;
   metadata?: Prisma.InputJsonValue;
@@ -20,6 +21,7 @@ type Client = Prisma.TransactionClient | typeof prisma;
 export async function logActivity(input: ActivityInput, client: Client = prisma) {
   return client.activity.create({
     data: {
+      agentId: input.agentId,
       type: input.type,
       body: input.body ?? null,
       metadata: input.metadata,

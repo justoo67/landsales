@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { syncLeadNextAction } from '@/lib/tasks';
 import { isVisitStatus, VISIT_STATUS_LABELS, type VisitStatus } from '@/lib/visits';
@@ -21,15 +21,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await req.json();
 
-    const existing = await prisma.siteVisit.findUnique({ where: { id } });
+    const existing = await prisma.siteVisit.findFirst({
+      where: { id, agentId: auth.agentId },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'Visit not found' }, { status: 404 });
     }
@@ -91,6 +93,7 @@ export async function PATCH(
 
         await logActivity(
           {
+            agentId: auth.agentId,
             type: 'SITE_VISIT',
             body: detail,
             leadId: existing.leadId,
@@ -121,14 +124,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
 
-    const existing = await prisma.siteVisit.findUnique({ where: { id } });
+    const existing = await prisma.siteVisit.findFirst({
+      where: { id, agentId: auth.agentId },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'Visit not found' }, { status: 404 });
     }

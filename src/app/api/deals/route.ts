@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { saleRecordJson } from '@/lib/serialize';
 import {
   serializeMoney,
@@ -11,12 +11,13 @@ import { commissionTotals, receivablesAging } from '@/lib/finance';
 
 export async function GET() {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const deals = await prisma.saleRecord.findMany({
+      where: { plot: { agentId: auth.agentId } },
       include: {
         plot: {
           select: {

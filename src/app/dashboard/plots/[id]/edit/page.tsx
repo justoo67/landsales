@@ -3,7 +3,7 @@ import PlotForm from '@/components/plots/PlotForm';
 import DocumentsSection from '@/components/documents/DocumentsSection';
 import PriceGuidance from '@/components/pricing/PriceGuidance';
 import Link from 'next/link';
-import { getSession } from '@/lib/auth';
+import { getSession, ensureAgentForSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 
@@ -18,8 +18,9 @@ export default async function EditPlotPage({
   }
 
   const { id } = await params;
+  const agent = await ensureAgentForSession(session);
   const plot = await prisma.plot.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, agentId: agent.id },
   });
 
   if (!plot) {

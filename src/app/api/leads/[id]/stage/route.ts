@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireAgent } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { leadJson, validateStageTransition, stageLabel, stageOrder } from '@/lib/leads';
 
@@ -9,8 +9,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const auth = await requireAgent();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -20,8 +20,8 @@ export async function PATCH(
     const lostReason =
       typeof body.lostReason === 'string' ? body.lostReason.trim() : null;
 
-    const lead = await prisma.lead.findUnique({
-      where: { id },
+    const lead = await prisma.lead.findFirst({
+      where: { id, agentId: auth.agentId },
       include: {
         plot: {
           select: { id: true, saleRecord: { select: { id: true } } },
@@ -39,7 +39,7 @@ export async function PATCH(
 
     if (movingForward && !lead.nextActionAt) {
       const openTask = await prisma.task.findFirst({
-        where: { leadId: id, doneAt: null },
+        where: { leadId: id, doneAt: null, agentId: auth.agentId },
         select: { id: true },
       });
 
@@ -70,7 +70,7 @@ export async function PATCH(
     }
 
     const lastInStage = await prisma.lead.findFirst({
-      where: { stage },
+      where: { stage, agentId: auth.agentId },
       orderBy: { index: 'desc' },
       select: { index: true },
     });
@@ -93,6 +93,7 @@ export async function PATCH(
     });
 
     await logActivity({
+      agentId: auth.agentId,
       type: 'STAGE_CHANGED',
       body: `Moved from ${stageLabel(lead.stage)} to ${stageLabel(stage)}${
         stage === 'LOST' && lostReason ? ` — ${lostReason}` : ''
