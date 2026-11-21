@@ -108,7 +108,7 @@ The application is engineered primarily for iPhone / mobile field use adhering t
 1. **Security & Authentication:**
    * **Primary Mobile Login: Google OAuth 2.0** — Fast, 1-tap mobile sign-in without remembering or typing passwords on an iPhone keyboard.
    * **Secondary / Fallback: Email & Password** — Traditional credential login with secure hash (Argon2/bcrypt) for non-Google accounts or network restrictions.
-   * **Single-Agent Allowlist Protection:** Access is locked to the specific agent's verified email address (`ALLOWED_AGENT_EMAIL`). Any third-party attempting to log in via Google receives a clean "Access Restricted" notice, eliminating unauthorized signups without requiring complex RBAC tables.
+   * **Allowlist Protection:** Access is limited to verified addresses in `ALLOWED_AGENT_EMAIL` (comma- or newline-separated). Each address gets its own account and sees only its own data; unlisted third parties get a clean "Access Restricted" notice.
    * **Persistent Mobile Sessions:** Long-lived secure sessions (JWT in HTTP-only, secure cookies) so the agent stays signed in when reopening Safari from the iPhone home screen.
 2. **KPI Counters:**
    * Total Plots
@@ -251,5 +251,5 @@ flowchart LR
 To maintain extreme speed and simplicity for the agent, the following are intentionally deferred:
 1. **Public Marketplace / Search Directory:** A public homepage where random visitors search listings.
 2. **Boundary Polygon Drawing:** Plot perimeter polygon outlines (MVP relies on high-accuracy pin + GPS).
-3. **Multi-Agent / Team Permissions:** Multiple agent accounts under a broker.
+3. **Multi-Agent / Team Permissions:** Multiple agent accounts under one broker, with shared bookkeeping across them (individual agent accounts are supported).
 4. **Online Payment Processing:** In-app deposits or credit card checkouts.

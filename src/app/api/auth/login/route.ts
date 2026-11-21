@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Single-agent deployment: only the configured address may sign in.
+    // Allowlisted agents only, but each address signs in to its own account.
     if (!isAllowedAgentEmail(normalizedEmail)) {
       return NextResponse.json({ error: 'Access restricted' }, { status: 403 });
     }
